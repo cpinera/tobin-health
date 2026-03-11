@@ -1,0 +1,16 @@
+{
+  "name": "tobin-health",
+  "version": "1.0.0",
+  "description": "Agente de salud y entrenamiento personal para Cristóbal",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "axios": "^1.6.0",
+    "express": "^4.18.0",
+    "node-cron": "^3.0.3"
+  }
+}

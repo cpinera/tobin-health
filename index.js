@@ -198,6 +198,20 @@ app.get("/garmin/test", auth, async (req, res) => {
   }
 });
 
+// Inspect: list all methods on GarminConnect client
+app.get("/garmin/methods", auth, async (req, res) => {
+  try {
+    const { getClient } = require("./garmin");
+    const gc = await getClient();
+    const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(gc))
+      .filter(m => typeof gc[m] === "function" && m !== "constructor")
+      .sort();
+    res.json({ count: methods.length, methods });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Force briefing
 app.get("/send-briefing", auth, async (req, res) => {
   try {

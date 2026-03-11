@@ -187,6 +187,17 @@ app.post("/webhook", async (req, res) => {
 
 app.get("/health", (req, res) => res.json({ ok: true, service: "tobin-health" }));
 
+// Diagnostic: test which Garmin endpoints are available
+app.get("/garmin/test", auth, async (req, res) => {
+  try {
+    const { testEndpoints } = require("./garmin");
+    const results = await testEndpoints();
+    res.json(results);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Force briefing
 app.get("/send-briefing", auth, async (req, res) => {
   try {

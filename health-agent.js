@@ -161,11 +161,10 @@ async function generateDailyBriefing() {
   const tod = garmin.today();
   const yest = garmin.daysAgo(1);
 
-  const [sleep, hrToday, hrYesterday, steps, recentActivities] = await Promise.allSettled([
+  const [sleep, hrToday, hrYesterday, recentActivities] = await Promise.allSettled([
     garmin.getSleepData(yest),       // sueño de anoche
     garmin.getHeartRate(tod),        // FC de hoy
     garmin.getHeartRate(yest),       // FC de ayer para comparar
-    garmin.getSteps(tod),
     garmin.getRecentActivities(7),
   ]);
 
@@ -176,7 +175,6 @@ async function generateDailyBriefing() {
     sleep: val(sleep),
     heartRateToday: val(hrToday),
     heartRateYesterday: val(hrYesterday),
-    steps: val(steps),
     recentActivities: val(recentActivities),
     weeksToRace: GOAL.weeksOut,
   };

@@ -1,19 +1,15 @@
 /**
- * garmin.js
- * Acceso a Garmin Connect via garmin-connect 1.6.2
- * Maneja 403 en endpoints premium con fallback graceful
+ * garmin.js — métodos confirmados de garmin-connect@1.6.2
  */
-
 const { GarminConnect } = require("garmin-connect");
 
 let client = null;
 let lastAuth = null;
-const AUTH_TTL = 55 * 60 * 1000; // re-auth every 55 min
+const AUTH_TTL = 55 * 60 * 1000;
 
 async function getClient() {
   const now = Date.now();
   if (client && lastAuth && now - lastAuth < AUTH_TTL) return client;
-
   const gc = new GarminConnect({
     username: process.env.GARMIN_EMAIL,
     password: process.env.GARMIN_PASSWORD,
@@ -25,65 +21,50 @@ async function getClient() {
   return client;
 }
 
-// Safe wrapper — returns null on 403/404 instead of throwing
 async function safe(fn) {
-  try {
-    return await fn();
-  } catch (e) {
+  try { return await fn(); }
+  catch (e) {
     const code = e?.statusCode || e?.response?.status;
-    if (code === 403 || code === 404) {
-      console.log(`[Garmin] Endpoint not available (${code}): ${e.message}`);
-      return null;
-    }
+    if (code === 403 || code === 404) { console.log(`[Garmin] ${code}: ${e.message}`); return null; }
     throw e;
   }
 }
 
 const today = () => new Date().toISOString().split("T")[0];
-const daysAgo = (n) => {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().split("T")[0];
-};
+const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().split("T")[0]; };
 
-// ── Endpoints que generalmente SÍ funcionan ──────────────────────────────────
-
-async function getDailySummary(date = today()) {
-  const gc = await getClient();
-  return safe(() => gc.getDailySummary(gc.userHash, date));
-}
+// ── Métodos confirmados ──────────────────────────────────────────────────────
 
 async function getSleepData(date = today()) {
   const gc = await getClient();
-  return safe(() => gc.getSleepData(gc.userHash, date));
-}
-
-async function getStress(date = today()) {
-  const gc = await getClient();
-  return safe(() => gc.getStressData(gc.userHash, date));
+  return safe(() => gc.getSleepData(new Date(date)));
 }
 
 async function getHeartRate(date = today()) {
   const gc = await getClient();
-  return safe(() => gc.getHeartRate(gc.userHash, date));
+  return safe(() => gc.getHeartRate(new Date(date)));
 }
 
-async function getRestingHeartRate(date = today()) {
+async function getSteps(date = today()) {
   const gc = await getClient();
-  return safe(() => gc.getRestingHeartRate(gc.userHash, date));
+  return safe(async () => {
+    // Try with userHash first, fall back to date only
+    try { return await gc.getSteps(gc.userHash, new Date(date)); }
+    catch { return await gc.getSteps(new Date(date)); }
+  });
+}
+
+async function getActivities(start = 0, limit = 10) {
+  const gc = await getClient();
+  return safe(() => gc.getActivities(start, limit));
 }
 
 async function getLastActivity() {
   const gc = await getClient();
   return safe(async () => {
-    const activities = await gc.getActivities(0, 1);
-    return activities[0] || null;
+    const acts = await gc.getActivities(0, 1);
+    return acts?.[0] || null;
   });
-}
-
-async function getActivitiesByDate(startDate, endDate = today()) {
-  const gc = await getClient();
-  return safe(() => gc.getActivities(0, 20, startDate, endDate));
 }
 
 async function getActivityDetails(activityId) {
@@ -91,87 +72,49 @@ async function getActivityDetails(activityId) {
   return safe(() => gc.getActivity({ activityId }));
 }
 
-async function getPersonalRecords() {
-  const gc = await getClient();
-  return safe(() => gc.getPersonalRecord());
+async function getRecentActivities(days = 7) {
+  const acts = await getActivities(0, 20);
+  if (!acts) return [];
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  return acts.filter(a => new Date(a.startTimeLocal) >= cutoff);
 }
 
-async function getBodyComposition(startDate = daysAgo(30), endDate = today()) {
+async function getUserProfile() {
   const gc = await getClient();
-  return safe(() => gc.getBodyComposition(gc.userHash, startDate, endDate));
+  return safe(() => gc.getUserProfile());
 }
 
-// ── Endpoints premium (pueden dar 403 según dispositivo/plan) ────────────────
-
-async function getHRV(date = today()) {
+async function getWeight(date = today()) {
   const gc = await getClient();
-  return safe(() => gc.getHrvData(gc.userHash, date));
+  return safe(() => gc.getDailyWeightData(new Date(date)));
 }
 
-async function getBodyBattery(startDate = daysAgo(1), endDate = today()) {
-  const gc = await getClient();
-  return safe(() => gc.getBodyBattery(gc.userHash, [startDate, endDate]));
-}
-
-async function getTrainingReadiness(date = today()) {
-  const gc = await getClient();
-  return safe(() => gc.getTrainingReadiness(gc.userHash, date));
-}
-
-async function getTrainingStatus() {
-  const gc = await getClient();
-  return safe(() => gc.getTrainingStatus(gc.userHash));
-}
-
-async function getVO2Max() {
-  const gc = await getClient();
-  return safe(() => gc.getVO2MaxTracking(gc.userHash));
-}
-
-async function getRacePredictions() {
-  const gc = await getClient();
-  return safe(() => gc.getRacePredictions());
-}
-
-async function getWeeklyIntensityMinutes(date = today()) {
-  const gc = await getClient();
-  return safe(() => gc.getIntensityMinutes(gc.userHash, date));
-}
-
-async function getHRVTrend(days = 7) {
+async function getSleepTrend(days = 7) {
   const results = [];
   for (let i = days - 1; i >= 0; i--) {
-    const hrv = await getHRV(daysAgo(i));
-    results.push({ date: daysAgo(i), hrv });
+    const sleep = await getSleepData(daysAgo(i));
+    results.push({ date: daysAgo(i), sleep });
   }
   return results;
 }
 
-// ── Diagnostic: test which endpoints work ────────────────────────────────────
 async function testEndpoints() {
   const tests = {
-    dailySummary:      () => getDailySummary(),
-    sleep:             () => getSleepData(),
-    stress:            () => getStress(),
-    heartRate:         () => getHeartRate(),
-    restingHeartRate:  () => getRestingHeartRate(),
-    lastActivity:      () => getLastActivity(),
-    hrv:               () => getHRV(),
-    bodyBattery:       () => getBodyBattery(),
-    trainingReadiness: () => getTrainingReadiness(),
-    trainingStatus:    () => getTrainingStatus(),
-    vo2max:            () => getVO2Max(),
-    racePredictions:   () => getRacePredictions(),
-    personalRecords:   () => getPersonalRecords(),
+    sleep:        () => getSleepData(),
+    heartRate:    () => getHeartRate(),
+    steps:        () => getSteps(),
+    lastActivity: () => getLastActivity(),
+    userProfile:  () => getUserProfile(),
+    weight:       () => getWeight(),
   };
-
   const results = {};
   for (const [name, fn] of Object.entries(tests)) {
     try {
       const data = await fn();
-      results[name] = data !== null ? "✅ OK" : "⚠️ null (403/404)";
+      results[name] = data !== null ? "✅ OK" : "⚠️ null";
     } catch (e) {
-      results[name] = `❌ Error: ${e.message}`;
+      results[name] = `❌ ${e.message}`;
     }
   }
   return results;
@@ -179,11 +122,8 @@ async function testEndpoints() {
 
 module.exports = {
   getClient, today, daysAgo, safe,
-  getDailySummary, getSleepData, getStress,
-  getHeartRate, getRestingHeartRate,
-  getLastActivity, getActivitiesByDate, getActivityDetails,
-  getPersonalRecords, getBodyComposition,
-  getHRV, getBodyBattery, getTrainingReadiness, getTrainingStatus,
-  getVO2Max, getRacePredictions, getWeeklyIntensityMinutes,
-  getHRVTrend, testEndpoints,
+  getSleepData, getHeartRate, getSteps,
+  getActivities, getLastActivity, getActivityDetails,
+  getRecentActivities, getUserProfile, getWeight,
+  getSleepTrend, testEndpoints,
 };

@@ -1,134 +1,29 @@
 /**
  * garmin.js
- * Wrapper para llamar herramientas del MCP @nicolasvegam/garmin-connect-mcp
- * El MCP corre como proceso hijo via npx y se comunica por stdio (JSON-RPC)
+ * Acceso directo a Garmin Connect usando la librería garmin-connect
+ * Evita depender del proceso MCP via npx
  */
 
-const { spawn } = require("child_process");
+const { GarminConnect } = require("garmin-connect");
 
-let mcpProcess = null;
-let requestId = 1;
-const pending = new Map();
-let initialized = false;
-let initPromise = null;
+let client = null;
+let lastAuth = null;
+const AUTH_TTL = 60 * 60 * 1000; // re-auth every hour
 
-function startMCP() {
-  if (mcpProcess) return;
+async function getClient() {
+  const now = Date.now();
+  if (client && lastAuth && now - lastAuth < AUTH_TTL) return client;
 
-  mcpProcess = spawn("npx", ["-y", "@nicolasvegam/garmin-connect-mcp"], {
-    env: {
-      ...process.env,
-      GARMIN_EMAIL: process.env.GARMIN_EMAIL,
-      GARMIN_PASSWORD: process.env.GARMIN_PASSWORD,
-    },
-    stdio: ["pipe", "pipe", "pipe"],
+  client = new GarminConnect({
+    username: process.env.GARMIN_EMAIL,
+    password: process.env.GARMIN_PASSWORD,
   });
 
-  let buffer = "";
-
-  mcpProcess.stdout.on("data", (data) => {
-    buffer += data.toString();
-    const lines = buffer.split("\n");
-    buffer = lines.pop(); // keep incomplete line
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        const msg = JSON.parse(line);
-        if (msg.id && pending.has(msg.id)) {
-          const { resolve, reject } = pending.get(msg.id);
-          pending.delete(msg.id);
-          if (msg.error) reject(new Error(msg.error.message || "MCP error"));
-          else resolve(msg.result);
-        }
-      } catch (e) {
-        // ignore non-JSON lines (startup logs, etc.)
-      }
-    }
-  });
-
-  mcpProcess.stderr.on("data", (data) => {
-    const msg = data.toString();
-    // Only log real errors, not info messages
-    if (msg.includes("Error") || msg.includes("error")) {
-      console.error("[Garmin MCP stderr]", msg);
-    }
-  });
-
-  mcpProcess.on("exit", (code) => {
-    console.log(`[Garmin MCP] process exited with code ${code}`);
-    mcpProcess = null;
-    initialized = false;
-    initPromise = null;
-    // Reject all pending requests
-    for (const [, { reject }] of pending) {
-      reject(new Error("MCP process exited"));
-    }
-    pending.clear();
-  });
+  await client.login(process.env.GARMIN_EMAIL, process.env.GARMIN_PASSWORD);
+  lastAuth = now;
+  console.log("[Garmin] Authenticated successfully");
+  return client;
 }
-
-function sendRPC(method, params = {}) {
-  return new Promise((resolve, reject) => {
-    if (!mcpProcess) {
-      return reject(new Error("MCP process not running"));
-    }
-    const id = requestId++;
-    pending.set(id, { resolve, reject });
-    const msg = JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n";
-    mcpProcess.stdin.write(msg);
-    // Timeout after 30s
-    setTimeout(() => {
-      if (pending.has(id)) {
-        pending.delete(id);
-        reject(new Error(`MCP timeout for ${method}`));
-      }
-    }, 30000);
-  });
-}
-
-async function initMCP() {
-  if (initialized) return;
-  if (initPromise) return initPromise;
-
-  initPromise = (async () => {
-    startMCP();
-    // Send initialize handshake
-    await sendRPC("initialize", {
-      protocolVersion: "2024-11-05",
-      capabilities: {},
-      clientInfo: { name: "tobin-health", version: "1.0.0" },
-    });
-    await sendRPC("notifications/initialized");
-    initialized = true;
-  })();
-
-  return initPromise;
-}
-
-/**
- * Call a Garmin MCP tool by name with arguments
- * @param {string} toolName - e.g. "get_sleep_data"
- * @param {object} args - tool arguments
- * @returns {Promise<any>} - parsed tool result
- */
-async function callTool(toolName, args = {}) {
-  await initMCP();
-  const result = await sendRPC("tools/call", {
-    name: toolName,
-    arguments: args,
-  });
-  // MCP returns { content: [{ type: "text", text: "..." }] }
-  if (result && result.content && result.content[0]) {
-    try {
-      return JSON.parse(result.content[0].text);
-    } catch {
-      return result.content[0].text;
-    }
-  }
-  return result;
-}
-
-// ─── Convenience wrappers ────────────────────────────────────────────────────
 
 const today = () => new Date().toISOString().split("T")[0];
 const daysAgo = (n) => {
@@ -138,83 +33,102 @@ const daysAgo = (n) => {
 };
 
 async function getDailySummary(date = today()) {
-  return callTool("get_daily_summary", { date });
+  const gc = await getClient();
+  return gc.getDailySummary(gc.userHash, date);
 }
 
 async function getSleepData(date = today()) {
-  return callTool("get_sleep_data", { date });
+  const gc = await getClient();
+  return gc.getSleepData(gc.userHash, date);
 }
 
 async function getHRV(date = today()) {
-  return callTool("get_hrv", { date });
+  const gc = await getClient();
+  try { return await gc.getHrvData(gc.userHash, date); }
+  catch { return null; }
 }
 
 async function getBodyBattery(startDate = daysAgo(1), endDate = today()) {
-  return callTool("get_body_battery", { startDate, endDate });
+  const gc = await getClient();
+  return gc.getBodyBattery(gc.userHash, [startDate, endDate]);
 }
 
 async function getTrainingReadiness(date = today()) {
-  return callTool("get_training_readiness", { date });
+  const gc = await getClient();
+  try { return await gc.getTrainingReadiness(gc.userHash, date); }
+  catch { return null; }
 }
 
 async function getTrainingStatus() {
-  return callTool("get_training_status", {});
+  const gc = await getClient();
+  try { return await gc.getTrainingStatus(gc.userHash); }
+  catch { return null; }
 }
 
 async function getStress(date = today()) {
-  return callTool("get_stress", { date });
+  const gc = await getClient();
+  return gc.getStressData(gc.userHash, date);
 }
 
 async function getHeartRate(date = today()) {
-  return callTool("get_heart_rate", { date });
+  const gc = await getClient();
+  return gc.getHeartRate(gc.userHash, date);
 }
 
 async function getRestingHeartRate(date = today()) {
-  return callTool("get_resting_heart_rate", { date });
+  const gc = await getClient();
+  return gc.getRestingHeartRate(gc.userHash, date);
 }
 
 async function getLastActivity() {
-  return callTool("get_last_activity", {});
+  const gc = await getClient();
+  const activities = await gc.getActivities(0, 1);
+  return activities[0] || null;
 }
 
 async function getActivitiesByDate(startDate, endDate = today()) {
-  return callTool("get_activities_by_date", { startDate, endDate });
+  const gc = await getClient();
+  return gc.getActivities(0, 20, startDate, endDate);
 }
 
 async function getActivityDetails(activityId) {
-  return callTool("get_activity_details", { activityId });
+  const gc = await getClient();
+  return gc.getActivity({ activityId });
 }
 
 async function getVO2Max() {
-  return callTool("get_vo2max", {});
+  const gc = await getClient();
+  try { return await gc.getVO2MaxTracking(gc.userHash); }
+  catch { return null; }
 }
 
 async function getRacePredictions() {
-  return callTool("get_race_predictions", {});
+  const gc = await getClient();
+  try { return await gc.getRacePredictions(); }
+  catch { return null; }
 }
 
 async function getPersonalRecords() {
-  return callTool("get_personal_records", {});
+  const gc = await getClient();
+  return gc.getPersonalRecord();
 }
 
 async function getBodyComposition(startDate = daysAgo(30), endDate = today()) {
-  return callTool("get_body_composition", { startDate, endDate });
-}
-
-async function getProgressSummary(startDate, endDate = today(), activityType = "running") {
-  return callTool("get_progress_summary", { startDate, endDate, activityType });
+  const gc = await getClient();
+  return gc.getBodyComposition(gc.userHash, startDate, endDate);
 }
 
 async function getWeeklyIntensityMinutes(date = today()) {
-  return callTool("get_weekly_intensity_minutes", { date });
+  const gc = await getClient();
+  try { return await gc.getIntensityMinutes(gc.userHash, date); }
+  catch { return null; }
 }
 
 async function getHRVTrend(days = 7) {
-  // Get HRV for last N days
   const results = [];
   for (let i = days - 1; i >= 0; i--) {
     try {
-      const hrv = await callTool("get_hrv", { date: daysAgo(i) });
+      const hrv = await getHRV(daysAgo(i));
       results.push({ date: daysAgo(i), hrv });
     } catch {
       results.push({ date: daysAgo(i), hrv: null });
@@ -224,26 +138,11 @@ async function getHRVTrend(days = 7) {
 }
 
 module.exports = {
-  callTool,
-  today,
-  daysAgo,
-  getDailySummary,
-  getSleepData,
-  getHRV,
-  getBodyBattery,
-  getTrainingReadiness,
-  getTrainingStatus,
-  getStress,
-  getHeartRate,
-  getRestingHeartRate,
-  getLastActivity,
-  getActivitiesByDate,
-  getActivityDetails,
-  getVO2Max,
-  getRacePredictions,
-  getPersonalRecords,
-  getBodyComposition,
-  getProgressSummary,
-  getWeeklyIntensityMinutes,
-  getHRVTrend,
+  getClient, today, daysAgo,
+  getDailySummary, getSleepData, getHRV, getBodyBattery,
+  getTrainingReadiness, getTrainingStatus, getStress,
+  getHeartRate, getRestingHeartRate, getLastActivity,
+  getActivitiesByDate, getActivityDetails, getVO2Max,
+  getRacePredictions, getPersonalRecords, getBodyComposition,
+  getWeeklyIntensityMinutes, getHRVTrend,
 };

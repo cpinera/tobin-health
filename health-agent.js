@@ -6,6 +6,7 @@
 
 const Anthropic = require("@anthropic-ai/sdk");
 const garmin = require("./garmin");
+const whoop  = require("./whoop");
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_KEY });
 
@@ -77,6 +78,30 @@ const GARMIN_TOOLS = [
       required: ["activityId"],
     },
   },
+  {
+    name: "get_whoop_recovery",
+    description: "Recovery score de Whoop (0-100%), HRV en ms, FC reposo, SpO2. El dato más importante para saber si Cristóbal puede entrenar fuerte hoy.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "get_whoop_sleep",
+    description: "Sueño según Whoop: score, horas totales, eficiencia, horas de sueño profundo y REM, número de interrupciones",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "get_whoop_strain",
+    description: "Strain del día según Whoop (0-21): carga cardiovascular acumulada del día",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "get_whoop_history",
+    description: "Historial de recovery score y HRV de los últimos N días para ver tendencia",
+    input_schema: {
+      type: "object",
+      properties: { days: { type: "number", description: "Días hacia atrás, default 7" } },
+      required: [],
+    },
+  },
 ];
 
 async function executeTool(name, input) {
@@ -88,6 +113,10 @@ async function executeTool(name, input) {
     case "get_recent_activities": return garmin.getRecentActivities(input.days || 7);
     case "get_sleep_trend":     return garmin.getSleepTrend(input.days || 7);
     case "get_activity_details": return garmin.getActivityDetails(input.activityId);
+    case "get_whoop_recovery":  return whoop.getLatestRecovery();
+    case "get_whoop_sleep":     return whoop.getLatestSleep();
+    case "get_whoop_strain":    return whoop.getLatestCycle();
+    case "get_whoop_history":   return whoop.getRecoveryHistory(input.days || 7);
     default: throw new Error(`Tool desconocida: ${name}`);
   }
 }
@@ -161,18 +190,20 @@ async function generateDailyBriefing() {
   const tod = garmin.today();
   const yest = garmin.daysAgo(1);
 
-  const [sleep, hrToday, hrYesterday, recentActivities] = await Promise.allSettled([
-    garmin.getSleepData(yest),       // sueño de anoche
-    garmin.getHeartRate(tod),        // FC de hoy
-    garmin.getHeartRate(yest),       // FC de ayer para comparar
+  const [sleep, hrToday, hrYesterday, recentActivities, whoopData] = await Promise.allSettled([
+    garmin.getSleepData(yest),
+    garmin.getHeartRate(tod),
+    garmin.getHeartRate(yest),
     garmin.getRecentActivities(7),
+    whoop.getDailySummary().catch(() => null),
   ]);
 
   const val = s => s.status === "fulfilled" ? s.value : null;
 
   const data = {
     date: tod,
-    sleep: val(sleep),
+    whoop: val(whoopData),              // recovery score, HRV, strain, sueño Whoop
+    garminSleep: val(sleep),            // sueño Garmin (backup)
     heartRateToday: val(hrToday),
     heartRateYesterday: val(hrYesterday),
     recentActivities: val(recentActivities),

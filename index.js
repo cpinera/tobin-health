@@ -7,6 +7,7 @@ const express = require("express");
 const axios = require("axios");
 const cron = require("node-cron");
 const { runAgent, generateDailyBriefing, checkAlerts } = require("./health-agent");
+const whoop = require("./whoop");
 
 const app = express();
 app.use(express.json());
@@ -209,6 +210,37 @@ app.get("/garmin/methods", auth, async (req, res) => {
     res.json({ count: methods.length, methods });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Whoop OAuth ──────────────────────────────────────────────────────────────
+
+// Step 1: Start OAuth — visit this URL to connect Whoop
+app.get("/whoop/start", (req, res) => {
+  const url = whoop.getAuthURL();
+  res.redirect(url);
+});
+
+// Step 2: Callback — Whoop redirects here with ?code=
+app.get("/whoop/callback", async (req, res) => {
+  const { code } = req.query;
+  if (!code) return res.status(400).send("Missing code");
+  try {
+    await whoop.exchangeCode(code);
+    await sendTelegram("✅ *Whoop conectado correctamente.* Ya tengo acceso a tu recovery score, HRV y sueño.");
+    res.send("<h2>✅ Whoop conectado</h2><p>Puedes cerrar esta ventana. El agente ya tiene acceso a tus datos.</p>");
+  } catch (e) {
+    res.status(500).send(`Error: ${e.message}`);
+  }
+});
+
+// Whoop status
+app.get("/whoop/status", auth, async (req, res) => {
+  try {
+    const summary = await whoop.getDailySummary();
+    res.json({ connected: true, summary });
+  } catch (e) {
+    res.json({ connected: false, error: e.message });
   }
 });
 

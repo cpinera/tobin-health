@@ -197,7 +197,7 @@ async function getDailySummary() {
 }
 
 module.exports = {
-  getAuthURL, exchangeCode,
+  getAuthURL, exchangeCode, whoopGet,
   getLatestRecovery, getRecoveryHistory,
   getLatestSleep, getLatestCycle,
   getTodayWorkouts, isConnected, getDailySummary,

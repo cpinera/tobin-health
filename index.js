@@ -244,6 +244,25 @@ app.get("/whoop/status", auth, async (req, res) => {
   }
 });
 
+// Whoop raw debug
+app.get("/whoop/debug", auth, async (req, res) => {
+  try {
+    const { whoopGet } = require("./whoop");
+    const [recovery, sleep, cycle] = await Promise.allSettled([
+      whoopGet("/recovery", { limit: 3 }),
+      whoopGet("/activity/sleep", { limit: 3 }),
+      whoopGet("/cycle", { limit: 3 }),
+    ]);
+    res.json({
+      recovery: recovery.status === "fulfilled" ? recovery.value : { error: recovery.reason?.message },
+      sleep:    sleep.status === "fulfilled"    ? sleep.value    : { error: sleep.reason?.message },
+      cycle:    cycle.status === "fulfilled"    ? cycle.value    : { error: cycle.reason?.message },
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Force briefing
 app.get("/send-briefing", auth, async (req, res) => {
   try {

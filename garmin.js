@@ -7,7 +7,7 @@ let client = null;
 let lastAuth = null;
 const AUTH_TTL = 55 * 60 * 1000;
 
-async function getClient() 
+async function getClient() {
   const now = Date.now();
   if (client && lastAuth && now - lastAuth < AUTH_TTL) return client;
   const gc = new GarminConnect({
@@ -33,8 +33,6 @@ async function safe(fn) {
 const today = () => new Date().toISOString().split("T")[0];
 const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().split("T")[0]; };
 
-// ── Métodos confirmados ──────────────────────────────────────────────────────
-
 async function getSleepData(date = today()) {
   const gc = await getClient();
   return safe(() => gc.getSleepData(new Date(date)));
@@ -48,7 +46,6 @@ async function getHeartRate(date = today()) {
 async function getSteps(date = today()) {
   const gc = await getClient();
   return safe(async () => {
-    // Try with userHash first, fall back to date only
     try { return await gc.getSteps(gc.userHash, new Date(date)); }
     catch { return await gc.getSteps(new Date(date)); }
   });

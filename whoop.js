@@ -110,33 +110,50 @@ async function whoopGet(path, params = {}) {
   return r.data;
 }
 
-// Latest recovery (score, HRV, RHR, SpO2)
-async function getLatestRecovery() {
-  const data = await whoopGet("/recovery", { limit: 1 });
-  return data?.records?.[0] || null;
-}
-
-// Recovery for last N days
-async function getRecoveryHistory(days = 7) {
-  const start = new Date();
-  start.setDate(start.getDate() - days);
-  const data = await whoopGet("/recovery", {
-    start: start.toISOString(),
-    limit: days + 1,
-  });
+// Get cycles (each cycle contains strain; recovery/sleep linked via cycle_id)
+async function getCycles(limit = 3) {
+  const data = await whoopGet("/cycle", { limit });
   return data?.records || [];
 }
 
-// Latest sleep
-async function getLatestSleep() {
-  const data = await whoopGet("/activity/sleep", { limit: 1 });
-  return data?.records?.[0] || null;
+async function getLatestCycle() {
+  const cycles = await getCycles(1);
+  return cycles[0] || null;
 }
 
-// Latest cycle (strain)
-async function getLatestCycle() {
-  const data = await whoopGet("/cycle", { limit: 1 });
-  return data?.records?.[0] || null;
+// Recovery lives at /cycle/{cycle_id}/recovery
+async function getLatestRecovery() {
+  const cycle = await getLatestCycle();
+  if (!cycle) return null;
+  try {
+    const data = await whoopGet(`/cycle/${cycle.id}/recovery`);
+    return data;
+  } catch { return null; }
+}
+
+// Recovery history — fetch last N cycles and their recovery
+async function getRecoveryHistory(days = 7) {
+  const cycles = await getCycles(days);
+  const results = [];
+  for (const cycle of cycles) {
+    try {
+      const rec = await whoopGet(`/cycle/${cycle.id}/recovery`);
+      results.push({ cycle_id: cycle.id, start: cycle.start, recovery: rec });
+    } catch {
+      results.push({ cycle_id: cycle.id, start: cycle.start, recovery: null });
+    }
+  }
+  return results;
+}
+
+// Sleep lives at /cycle/{cycle_id}/sleep
+async function getLatestSleep() {
+  const cycle = await getLatestCycle();
+  if (!cycle) return null;
+  try {
+    const data = await whoopGet(`/cycle/${cycle.id}/sleep`);
+    return data;
+  } catch { return null; }
 }
 
 // Today's workouts
@@ -153,45 +170,57 @@ async function getTodayWorkouts() {
 // Check if Whoop is connected
 async function isConnected() {
   try {
-    await loadTokens();
-    return true;
+    const tokens = await loadTokens();
+    return !!tokens;
   } catch { return false; }
 }
 
 // Summary object for briefing
 async function getDailySummary() {
-  const [recovery, sleep, cycle] = await Promise.allSettled([
-    getLatestRecovery(),
-    getLatestSleep(),
-    getLatestCycle(),
-  ]);
+  // Get last 2 cycles (today + yesterday)
+  const cycles = await getCycles(2);
+  const latest = cycles[0];
+  const prev   = cycles[1];
 
-  const val = s => s.status === "fulfilled" ? s.value : null;
-  const r = val(recovery);
-  const s = val(sleep);
-  const c = val(cycle);
+  let recovery = null;
+  let sleep    = null;
+
+  // Try recovery and sleep on latest cycle, fall back to previous
+  for (const cycle of cycles) {
+    if (!recovery) {
+      try { recovery = await whoopGet(`/cycle/${cycle.id}/recovery`); } catch {}
+    }
+    if (!sleep) {
+      try { sleep = await whoopGet(`/cycle/${cycle.id}/sleep`); } catch {}
+    }
+    if (recovery && sleep) break;
+  }
 
   return {
-    recovery: r ? {
-      score:       r.score?.recovery_score,
-      hrv:         r.score?.hrv_rmssd_milli,
-      rhr:         r.score?.resting_heart_rate,
-      spo2:        r.score?.spo2_percentage,
-      skinTemp:    r.score?.skin_temp_celsius,
+    recovery: recovery ? {
+      score:    recovery.score?.recovery_score,
+      hrv:      recovery.score?.hrv_rmssd_milli,
+      rhr:      recovery.score?.resting_heart_rate,
+      spo2:     recovery.score?.spo2_percentage,
+      skinTemp: recovery.score?.skin_temp_celsius,
     } : null,
-    sleep: s ? {
-      score:       s.score?.sleep_performance_percentage,
-      totalHours:  s.score ? (s.score.total_in_bed_time_milli / 3600000).toFixed(1) : null,
-      efficiency:  s.score?.sleep_efficiency_percentage,
-      deepHours:   s.score ? (s.score.slow_wave_sleep_duration_milli / 3600000).toFixed(1) : null,
-      remHours:    s.score ? (s.score.rem_sleep_duration_milli / 3600000).toFixed(1) : null,
-      disturbances: s.score?.disturbances_count,
+    sleep: sleep ? {
+      score:       sleep.score?.sleep_performance_percentage,
+      totalHours:  sleep.score ? (sleep.score.total_in_bed_time_milli / 3600000).toFixed(1) : null,
+      efficiency:  sleep.score?.sleep_efficiency_percentage,
+      deepHours:   sleep.score ? (sleep.score.slow_wave_sleep_duration_milli / 3600000).toFixed(1) : null,
+      remHours:    sleep.score ? (sleep.score.rem_sleep_duration_milli / 3600000).toFixed(1) : null,
+      disturbances: sleep.score?.disturbances_count,
     } : null,
-    strain: c ? {
-      score:       c.score?.strain,
-      avgHR:       c.score?.average_heart_rate,
-      maxHR:       c.score?.max_heart_rate,
-      kilojoules:  c.score?.kilojoule,
+    strain: latest ? {
+      score:      latest.score?.strain,
+      avgHR:      latest.score?.average_heart_rate,
+      maxHR:      latest.score?.max_heart_rate,
+      kilojoules: latest.score?.kilojoule,
+    } : null,
+    prevStrain: prev ? {
+      score:      prev.score?.strain,
+      kilojoules: prev.score?.kilojoule,
     } : null,
   };
 }

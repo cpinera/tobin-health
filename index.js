@@ -248,16 +248,18 @@ app.get("/whoop/status", auth, async (req, res) => {
 app.get("/whoop/debug", auth, async (req, res) => {
   try {
     const { whoopGet } = require("./whoop");
-    const [recovery, sleep, cycle] = await Promise.allSettled([
-      whoopGet("/recovery", { limit: 3 }),
-      whoopGet("/activity/sleep", { limit: 3 }),
-      whoopGet("/cycle", { limit: 3 }),
-    ]);
-    res.json({
-      recovery: recovery.status === "fulfilled" ? recovery.value : { error: recovery.reason?.message },
-      sleep:    sleep.status === "fulfilled"    ? sleep.value    : { error: sleep.reason?.message },
-      cycle:    cycle.status === "fulfilled"    ? cycle.value    : { error: cycle.reason?.message },
-    });
+    const cycles = await whoopGet("/cycle", { limit: 2 });
+    const cycleId = cycles?.records?.[0]?.id;
+    const results = { cycles: cycles?.records?.map(c => ({ id: c.id, start: c.start, strain: c.score?.strain })) };
+    if (cycleId) {
+      const [recovery, sleep] = await Promise.allSettled([
+        whoopGet(`/cycle/${cycleId}/recovery`),
+        whoopGet(`/cycle/${cycleId}/sleep`),
+      ]);
+      results.recovery = recovery.status === "fulfilled" ? recovery.value : { error: recovery.reason?.message };
+      results.sleep    = sleep.status === "fulfilled"    ? sleep.value    : { error: sleep.reason?.message };
+    }
+    res.json(results);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

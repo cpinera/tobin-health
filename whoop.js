@@ -6,7 +6,7 @@
 
 const axios = require("axios");
 
-const WHOOP_API   = "https://api.prod.whoop.com/developer/v1";
+const WHOOP_API   = "https://api.prod.whoop.com/developer/v2";
 const TOKEN_URL   = "https://api.prod.whoop.com/oauth/oauth2/token";
 const AUTH_URL    = "https://api.prod.whoop.com/oauth/oauth2/auth";
 const SUPABASE_URL = process.env.SUPABASE_URL;

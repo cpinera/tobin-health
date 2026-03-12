@@ -84,7 +84,7 @@ async function executeTool(name, input) {
       return list.map(compactActivity);
     }
     case "get_activities_history": {
-      const raw = await garmin.getActivitiesHistory(input.limit || 50);
+      const raw = await garmin.getActivitiesHistory(input.limit || 150);
       const list = Array.isArray(raw) ? raw : (raw?.activityList || []);
       return list.map(compactActivity);
     }

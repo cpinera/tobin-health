@@ -138,10 +138,33 @@ async function testEndpoints() {
   return results;
 }
 
+
+// VO2Max via Garmin internal endpoint
+async function getVO2Max(date = today()) {
+  const gc = await getClient();
+  const url = `https://connect.garmin.com/modern/proxy/metrics-service/metrics/maxmet/latest/${date}`;
+  return safe(() => gc.get(url));
+}
+
+// Training Readiness score + factors
+async function getTrainingReadiness(date = today()) {
+  const gc = await getClient();
+  const url = `https://connect.garmin.com/modern/proxy/metrics-service/metrics/trainingreadiness/${date}`;
+  return safe(() => gc.get(url));
+}
+
+// Training Status: productive, maintaining, overreaching, etc
+async function getTrainingStatus(date = today()) {
+  const gc = await getClient();
+  const url = `https://connect.garmin.com/modern/proxy/metrics-service/metrics/trainingstatus/aggregated/${date}`;
+  return safe(() => gc.get(url));
+}
+
 module.exports = {
   getClient, today, daysAgo, safe,
   getSleepData, getHeartRate, getSteps,
   getActivities, getLastActivity, getActivityDetails,
   getRecentActivities, getActivitiesHistory, getAllActivities, getUserProfile, getWeight,
   getSleepTrend, testEndpoints,
+  getVO2Max, getTrainingReadiness, getTrainingStatus,
 };

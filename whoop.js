@@ -42,11 +42,13 @@ async function loadTokens() {
 // ── OAuth helpers ─────────────────────────────────────────────────────────────
 
 function getAuthURL() {
+  const state = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     redirect_uri: REDIRECT_URI,
     response_type: "code",
     scope: "read:recovery read:sleep read:workout read:cycles read:body_measurement offline",
+    state,
   });
   return `${AUTH_URL}?${params.toString()}`;
 }

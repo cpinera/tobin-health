@@ -78,8 +78,24 @@ async function getRecentActivities(days = 30) {
   return acts.filter(a => new Date(a.startTimeLocal) >= cutoff);
 }
 
-async function getActivitiesHistory(limit = 50) {
-  return getActivities(0, limit);
+// Fetch all activities via pagination (goes beyond 100 limit)
+async function getAllActivities(maxActivities = 300) {
+  const pageSize = 100;
+  let all = [];
+  let start = 0;
+  while (start < maxActivities) {
+    const batch = await getActivities(start, pageSize);
+    if (!batch || batch.length === 0) break;
+    all = all.concat(batch);
+    if (batch.length < pageSize) break;
+    start += pageSize;
+  }
+  return all;
+}
+
+async function getActivitiesHistory(limit = 100) {
+  if (limit <= 100) return getActivities(0, limit);
+  return getAllActivities(limit);
 }
 
 async function getUserProfile() {
@@ -126,6 +142,6 @@ module.exports = {
   getClient, today, daysAgo, safe,
   getSleepData, getHeartRate, getSteps,
   getActivities, getLastActivity, getActivityDetails,
-  getRecentActivities, getActivitiesHistory, getUserProfile, getWeight,
+  getRecentActivities, getActivitiesHistory, getAllActivities, getUserProfile, getWeight,
   getSleepTrend, testEndpoints,
 };

@@ -7,7 +7,7 @@ let client = null;
 let lastAuth = null;
 const AUTH_TTL = 55 * 60 * 1000;
 
-async function getClient() {
+async function getClient() 
   const now = Date.now();
   if (client && lastAuth && now - lastAuth < AUTH_TTL) return client;
   const gc = new GarminConnect({
@@ -72,12 +72,17 @@ async function getActivityDetails(activityId) {
   return safe(() => gc.getActivity({ activityId }));
 }
 
-async function getRecentActivities(days = 7) {
-  const acts = await getActivities(0, 20);
+async function getRecentActivities(days = 30) {
+  const limit = Math.min(Math.max(days * 2, 30), 100);
+  const acts = await getActivities(0, limit);
   if (!acts) return [];
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
   return acts.filter(a => new Date(a.startTimeLocal) >= cutoff);
+}
+
+async function getActivitiesHistory(limit = 50) {
+  return getActivities(0, limit);
 }
 
 async function getUserProfile() {
@@ -124,6 +129,6 @@ module.exports = {
   getClient, today, daysAgo, safe,
   getSleepData, getHeartRate, getSteps,
   getActivities, getLastActivity, getActivityDetails,
-  getRecentActivities, getUserProfile, getWeight,
+  getRecentActivities, getActivitiesHistory, getUserProfile, getWeight,
   getSleepTrend, testEndpoints,
 };

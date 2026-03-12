@@ -67,6 +67,7 @@ const TOOLS = [
   { type: "function", function: { name: "get_last_activity",    description: "Última actividad: distancia, ritmo, FC",                    parameters: { type: "object", properties: {}, required: [] } } },
   { type: "function", function: { name: "get_recent_activities",description: "Actividades recientes con ritmos REALES. Usar para predicciones de tiempo.", parameters: { type: "object", properties: { days: { type: "number" } }, required: [] } } },
   { type: "function", function: { name: "get_whoop_summary",    description: "Resumen Whoop: recovery score, HRV, sueño, strain",         parameters: { type: "object", properties: {}, required: [] } } },
+  { type: "function", function: { name: "get_activities_history", description: "Historial completo de actividades (hasta 100). Usar cuando se pide ver más de 30 días atrás o toda la historia de entrenamientos.", parameters: { type: "object", properties: { limit: { type: "number", description: "Número de actividades, default 50" } }, required: [] } } },
 ];
 
 async function executeTool(name, input) {
@@ -78,9 +79,14 @@ async function executeTool(name, input) {
     case "get_last_activity":
       return garmin.getLastActivity().then(compactActivity);
     case "get_recent_activities": {
-      const raw = await garmin.getRecentActivities(input.days || 14);
+      const raw = await garmin.getRecentActivities(input.days || 30);
       const list = Array.isArray(raw) ? raw : (raw?.activityList || []);
-      return list.slice(0, 10).map(compactActivity);
+      return list.map(compactActivity);
+    }
+    case "get_activities_history": {
+      const raw = await garmin.getActivitiesHistory(input.limit || 50);
+      const list = Array.isArray(raw) ? raw : (raw?.activityList || []);
+      return list.map(compactActivity);
     }
     case "get_whoop_summary":
       return whoop.getDailySummary().then(compactWhoopSummary);

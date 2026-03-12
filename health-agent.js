@@ -15,19 +15,17 @@ const GOAL = {
   description: "Preparando carrera (5K-42K) en ~6 semanas",
 };
 
-// ── Tools en formato OpenAI ──────────────────────────────────────────────────
-
 const GARMIN_TOOLS = [
-  { type: "function", function: { name: "get_sleep", description: "Datos de sueño: duración total, fases (deep/light/REM/awake), score", parameters: { type: "object", properties: { date: { type: "string", description: "Fecha YYYY-MM-DD, default hoy" } }, required: [] } } },
+  { type: "function", function: { name: "get_sleep", description: "Datos de sueño: duración total, fases (deep/light/REM/awake), score", parameters: { type: "object", properties: { date: { type: "string" } }, required: [] } } },
   { type: "function", function: { name: "get_heart_rate", description: "Frecuencia cardíaca del día: mínima, máxima, promedio", parameters: { type: "object", properties: { date: { type: "string" } }, required: [] } } },
   { type: "function", function: { name: "get_steps", description: "Pasos del día", parameters: { type: "object", properties: { date: { type: "string" } }, required: [] } } },
   { type: "function", function: { name: "get_last_activity", description: "Última actividad registrada con métricas: distancia, tiempo, ritmo, FC promedio", parameters: { type: "object", properties: {}, required: [] } } },
-  { type: "function", function: { name: "get_recent_activities", description: "Actividades de los últimos N días (carreras, ciclismo, nado) con distancias y tiempos REALES. Usar estos datos para calcular predicciones de tiempo.", parameters: { type: "object", properties: { days: { type: "number", description: "Días hacia atrás, default 7" } }, required: [] } } },
+  { type: "function", function: { name: "get_recent_activities", description: "Actividades de los últimos N días con distancias y tiempos REALES. Usar para predicciones de tiempo.", parameters: { type: "object", properties: { days: { type: "number" } }, required: [] } } },
   { type: "function", function: { name: "get_sleep_trend", description: "Tendencia de sueño de los últimos N días", parameters: { type: "object", properties: { days: { type: "number" } }, required: [] } } },
-  { type: "function", function: { name: "get_activity_details", description: "Detalles completos de una actividad por ID: splits por km, FC por zona, cadencia", parameters: { type: "object", properties: { activityId: { type: "string" } }, required: ["activityId"] } } },
+  { type: "function", function: { name: "get_activity_details", description: "Detalles completos de actividad por ID: splits por km, FC por zona", parameters: { type: "object", properties: { activityId: { type: "string" } }, required: ["activityId"] } } },
   { type: "function", function: { name: "get_whoop_recovery", description: "Recovery score Whoop (0-100%), HRV, FC reposo, SpO2", parameters: { type: "object", properties: {}, required: [] } } },
-  { type: "function", function: { name: "get_whoop_sleep", description: "Sueño Whoop: score, horas totales, eficiencia, deep, REM, interrupciones", parameters: { type: "object", properties: {}, required: [] } } },
-  { type: "function", function: { name: "get_whoop_strain", description: "Strain del día Whoop (0-21): carga cardiovascular acumulada", parameters: { type: "object", properties: {}, required: [] } } },
+  { type: "function", function: { name: "get_whoop_sleep", description: "Sueño Whoop: score, horas, eficiencia, deep, REM, interrupciones", parameters: { type: "object", properties: {}, required: [] } } },
+  { type: "function", function: { name: "get_whoop_strain", description: "Strain del día Whoop (0-21)", parameters: { type: "object", properties: {}, required: [] } } },
   { type: "function", function: { name: "get_whoop_history", description: "Historial recovery y HRV últimos N días", parameters: { type: "object", properties: { days: { type: "number" } }, required: [] } } },
 ];
 
@@ -50,26 +48,26 @@ async function executeTool(name, input) {
 
 const SYSTEM_PROMPT = `Eres el entrenador personal de Cristóbal Piñera, triatleta amateur preparando una carrera en ~6 semanas. Entrena running, ciclismo y natación.
 
-REGLA FUNDAMENTAL: Siempre consulta datos reales con las tools ANTES de responder. Nunca inventes métricas.
+REGLA FUNDAMENTAL: Consulta datos reales con las tools ANTES de responder. Nunca inventes métricas.
 
-PREDICCIONES DE TIEMPO (muy importante):
-- Usa SOLO los ritmos reales de sus actividades (get_recent_activities o get_last_activity)
-- Fórmula Riegel para escalar distancias: T2 = T1 × (D2/D1)^1.06
-- Muestra siempre el cálculo: "Corriste 10K a 5:30/km → predigo 5K en ~26:10"
-- Si no hay datos suficientes de esa disciplina, dilo explícitamente
-- NUNCA uses tiempos genéricos de "corredor amateur promedio"
+PREDICCIONES DE TIEMPO:
+- Usa SOLO los ritmos reales de sus actividades (get_recent_activities)
+- Fórmula Riegel: T2 = T1 x (D2/D1)^1.06
+- Muestra el cálculo: "Corriste 10K a 5:30/km → predigo 5K en ~26:10"
+- Si no hay datos suficientes, dilo explícitamente
+- NUNCA uses tiempos genéricos de corredor promedio
 
-SEMÁFORO DE ENTRENAMIENTO basado en Whoop:
-- Recovery <33% 🔴 → solo descanso activo o movilidad
-- Recovery 33-66% 🟡 → entrenamiento moderado, sin intervalos
+SEMÁFORO Whoop:
+- Recovery <33% 🔴 → descanso activo solo
+- Recovery 33-66% 🟡 → moderado, sin intervalos
 - Recovery >66% 🟢 → puedes entrenar fuerte
 
 SEÑALES DE FATIGA:
-- HRV cayendo >15% vs semana → acumulación de fatiga
+- HRV cayendo >15% → acumulación de fatiga
 - FC reposo >10% sobre baseline → reducir intensidad
 - Sueño <6h o profundo <1h → priorizar recuperación
-- Nunca más de 2 días duros consecutivos
-- Taper: últimas 2 semanas, reducir volumen 30-40%
+- Nunca 2+ días duros consecutivos
+- Taper últimas 2 semanas: -30-40% volumen
 
 Habla en español, tono directo y motivador. Máximo 300 palabras para Telegram.`;
 
@@ -106,8 +104,8 @@ async function runAgent(userMessage, conversationHistory = []) {
       for (const tc of choice.message.tool_calls) {
         let result;
         try {
-          const input = JSON.parse(tc.function.arguments || "{}");
-          result = await executeTool(tc.function.name, input);
+          const inp = JSON.parse(tc.function.arguments || "{}");
+          result = await executeTool(tc.function.name, inp);
         } catch (e) {
           result = { error: e.message };
         }
@@ -115,7 +113,6 @@ async function runAgent(userMessage, conversationHistory = []) {
       }
       continue;
     }
-
     break;
   }
 
@@ -136,7 +133,6 @@ async function generateDailyBriefing() {
   ]);
 
   const val = s => s.status === "fulfilled" ? s.value : null;
-
   const data = {
     date: tod,
     whoop: val(whoopData),
@@ -154,7 +150,7 @@ async function generateDailyBriefing() {
       { role: "system", content: SYSTEM_PROMPT },
       {
         role: "user",
-        content: "Genera el briefing diario del " + tod + ". Estamos a " + GOAL.weeksOut + " semanas de la carrera.\n\nDatos reales:\n" + JSON.stringify(data, null, 2) + "\n\nIncluye: 1) Sueño y recuperación (prioriza datos Whoop) 2) Estado de forma con semáforo 🔴🟡🟢 3) Carga semanal con distancias reales 4) Recomendación concreta para hoy. Máximo 200 palabras.",
+        content: "Genera el briefing del " + tod + ". Estamos a " + GOAL.weeksOut + " semanas de la carrera.\n\nDatos:\n" + JSON.stringify(data, null, 2) + "\n\nIncluye: 1) Sueño/recuperación (prioriza Whoop) 2) Semáforo 🔴🟡🟢 3) Carga semanal con distancias reales 4) Recomendación para hoy. Máximo 200 palabras.",
       },
     ],
   });
@@ -177,25 +173,25 @@ async function checkAlerts() {
     if (today && avg.length >= 1) {
       const baseline = avg.reduce((a, b) => a + b, 0) / avg.length;
       if (today > baseline * 1.1) {
-        alerts.push("⚠️ *FC de reposo elevada* (" + today + " bpm vs baseline " + Math.round(baseline) + " bpm). Considera sesión suave o descanso.");
+        alerts.push("⚠️ *FC de reposo elevada* (" + today + " bpm vs " + Math.round(baseline) + " bpm baseline). Sesión suave o descanso.");
       }
     }
-  } catch (e) { console.error("Alert HR error:", e.message); }
+  } catch (e) { console.error("Alert HR:", e.message); }
 
   try {
     const sleep = await garmin.getSleepData(garmin.daysAgo(1));
-    const sleepSeconds = sleep?.dailySleepDTO?.sleepTimeSeconds || sleep?.sleepTimeSeconds;
-    if (sleepSeconds && sleepSeconds < 6 * 3600) {
-      alerts.push("😴 *Sueño corto anoche* (" + (sleepSeconds/3600).toFixed(1) + "h). Prioriza recuperación hoy.");
+    const secs = sleep?.dailySleepDTO?.sleepTimeSeconds || sleep?.sleepTimeSeconds;
+    if (secs && secs < 6 * 3600) {
+      alerts.push("😴 *Sueño corto* (" + (secs/3600).toFixed(1) + "h). Prioriza recuperación hoy.");
     }
-  } catch (e) { console.error("Alert sleep error:", e.message); }
+  } catch (e) { console.error("Alert sleep:", e.message); }
 
   try {
-    const whoopSummary = await whoop.getDailySummary();
-    if (whoopSummary?.recovery?.score != null && whoopSummary.recovery.score < 33) {
-      alerts.push("🔴 *Recovery Whoop muy bajo* (" + whoopSummary.recovery.score + "%). Día de descanso recomendado.");
+    const ws = await whoop.getDailySummary();
+    if (ws?.recovery?.score != null && ws.recovery.score < 33) {
+      alerts.push("🔴 *Recovery Whoop muy bajo* (" + ws.recovery.score + "%). Día de descanso recomendado.");
     }
-  } catch (e) { console.error("Alert Whoop error:", e.message); }
+  } catch (e) { console.error("Alert Whoop:", e.message); }
 
   return alerts;
 }

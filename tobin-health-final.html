@@ -1630,6 +1630,7 @@ loadConfig();
 loadChatHistory();
 loadDashboard();
 loadPlan();
+setTimeout(loadHabits, 2000);
 
 // --------------------------------------------------------
 //  TRAINING PLAN
@@ -1823,6 +1824,23 @@ function scrollToPlanDetail(dateStr) {
   if (el) el.scrollIntoView({behavior:'smooth', block:'center'});
 }
 
+// Alias for backward compat with patched Plan code
+let CCTX = COACH_CTX;
+
+// Sync CCTX with COACH_CTX after fetchPlan
+const _origFetchPlan = fetchPlan;
+async function loadPlanAndSync() {
+  await _origFetchPlan();
+  CCTX = COACH_CTX;
+}
+
+// loadHabits = alias for updateHabits (called from init)
+async function loadHabits() {
+  // HABITS already loaded in fetchAll
+  updateHabits();
+  drawHabitsChart('4w');
+}
+
 let currentPlanWeek = 0;
 function setPlanWeek(offset, btn) {
   btn.closest('.period-tabs').querySelectorAll('.period-tab').forEach(b=>b.classList.remove('active'));
@@ -1833,7 +1851,7 @@ function setPlanWeek(offset, btn) {
 }
 
 async function loadPlan() {
-  await fetchPlan();
+  await loadPlanAndSync();
   renderPlanKPIs();
   renderWeekGrid(0);
   renderPlanDetail(0);

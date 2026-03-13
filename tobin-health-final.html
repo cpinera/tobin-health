@@ -387,6 +387,59 @@ input[type=range] {
   nav { gap: 0; }
   .nav-btn { padding: 8px 12px; font-size: 13px; }
 }
+
+/* ══ PLAN SECTION ════════════════════════════════════════ */
+.plan-day-card {
+  border-radius: var(--radius-sm);
+  padding: 12px 10px;
+  text-align: center;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  transition: transform 0.12s, box-shadow 0.12s;
+  cursor: pointer;
+  min-height: 110px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+}
+.plan-day-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.plan-day-card.today { border-color: var(--blue); background: var(--blue-light); }
+.plan-day-card.rest { background: var(--surface-2); border-color: var(--border-light); }
+.plan-day .day-label { font-size: 10px; font-weight: 600; color: var(--text-hint); text-transform: uppercase; letter-spacing: 0.5px; }
+.plan-day .day-date { font-size: 11px; color: var(--text-secondary); }
+.plan-day .day-icon { font-size: 22px; margin: 4px 0; }
+.plan-day .day-type { font-size: 10px; font-weight: 600; color: var(--text-secondary); }
+.plan-day .day-dist { font-size: 11px; color: var(--text-hint); }
+
+.intensity-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 600;
+}
+.badge-aerobic { background: #e6f4ea; color: #1e8e3e; }
+.badge-threshold { background: #fef7e0; color: #f9ab00; }
+.badge-vo2max { background: #fce8e6; color: #d93025; }
+.badge-recovery { background: #e8f0fe; color: #1a73e8; }
+.badge-rest { background: var(--surface-2); color: var(--text-hint); }
+.badge-strength { background: #fbe9e7; color: #e65100; }
+
+.plan-detail-row {
+  display: flex; gap: 14px; padding: 14px 0;
+  border-bottom: 1px solid var(--border-light);
+  align-items: flex-start;
+}
+.plan-detail-row:last-child { border-bottom: none; }
+.plan-detail-icon {
+  width: 44px; height: 44px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+}
+.plan-detail-info { flex: 1; }
+.plan-detail-title { font-size: 14px; font-weight: 600; }
+.plan-detail-desc { font-size: 12px; color: var(--text-secondary); margin-top: 4px; line-height: 1.5; }
+.plan-detail-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.plan-detail-stats { text-align: right; flex-shrink: 0; }
+.plan-stat { font-size: 13px; font-weight: 600; }
+.plan-stat-label { font-size: 11px; color: var(--text-hint); }
+
 </style>
 </head>
 <body>
@@ -402,6 +455,7 @@ input[type=range] {
       <button class="nav-btn active" onclick="nav('dashboard', this)"><span class="icon">📊</span> Dashboard</button>
       <button class="nav-btn" onclick="nav('training', this)"><span class="icon">🏋️</span> Entrenos</button>
       <button class="nav-btn" onclick="nav('habits', this)"><span class="icon">✅</span> Hábitos</button>
+      <button class="nav-btn" onclick="nav('plan', this)"><span class="icon">📋</span> Plan</button>
     </nav>
     <div class="header-date" id="header-date"></div>
   </div>
@@ -409,8 +463,16 @@ input[type=range] {
 
 <main>
 
-<!-- Supabase pre-configurado -->
-<div class="setup-banner hidden" id="setup-banner"><input id="sb-url"><input id="sb-key"></div>
+<!-- ══ SETUP BANNER ══════════════════════════════════════ -->
+<div class="setup-banner hidden" id="setup-banner">
+  <span>⚙️</span>
+  <strong>Configura Supabase:</strong>
+  <div class="setup-fields">
+    <input class="setup-input" id="sb-url" placeholder="Supabase URL (https://xxx.supabase.co)" type="url">
+    <input class="setup-input" id="sb-key" placeholder="Supabase anon key" type="password">
+  </div>
+  <button class="setup-save" onclick="saveConfig()">Guardar</button>
+</div>
 
 <!-- ══════════════════════════════════════════════════════
      DASHBOARD
@@ -669,6 +731,75 @@ input[type=range] {
   </div>
 </section>
 
+
+<!-- ══════════════════════════════════════════════════════
+     PLAN DE ENTRENAMIENTO
+════════════════════════════════════════════════════════ -->
+<section id="s-plan" class="section">
+  <div class="section-header">
+    <h1>Plan de entrenamiento</h1>
+    <p id="plan-subtitle">Semana actual · Plan de maratón</p>
+  </div>
+
+  <!-- Contexto de semana del coach -->
+  <div class="card" id="coach-notes-card" style="margin-bottom:16px;border-left:4px solid var(--blue)">
+    <div style="display:flex;align-items:flex-start;gap:14px">
+      <div style="font-size:28px">👨‍💼</div>
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:600;color:var(--text-secondary);letter-spacing:0.4px;text-transform:uppercase;margin-bottom:4px">Nota del coach esta semana</div>
+        <div id="coach-notes-text" style="font-size:14px;line-height:1.6;color:var(--text-primary)">Cargando notas del coach…</div>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap" id="coach-week-chips"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Semana día a día -->
+  <div class="row cols-4" id="plan-kpis">
+    <div class="card metric-card">
+      <div class="metric-label"><div class="dot" style="background:#1a73e8"></div>KMs planificados</div>
+      <div class="metric-value" id="plan-km">—</div>
+      <div class="metric-unit">esta semana</div>
+    </div>
+    <div class="card metric-card">
+      <div class="metric-label"><div class="dot" style="background:#e65100"></div>TSS planificado</div>
+      <div class="metric-value" id="plan-tss">—</div>
+      <div class="metric-unit">Training Stress Score</div>
+    </div>
+    <div class="card metric-card">
+      <div class="metric-label"><div class="dot" style="background:#7c4dff"></div>Fase del plan</div>
+      <div class="metric-value" id="plan-phase" style="font-size:20px">—</div>
+      <div class="metric-unit" id="plan-week-num">semana —</div>
+    </div>
+    <div class="card metric-card">
+      <div class="metric-label"><div class="dot" style="background:#1e8e3e"></div>Sesiones clave</div>
+      <div class="metric-value" id="plan-key-sessions">—</div>
+      <div class="metric-unit">VO2Max + Umbral + Long</div>
+    </div>
+  </div>
+
+  <!-- Calendario semanal visual -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="chart-header" style="margin-bottom:16px">
+      <div class="chart-title">Semana de entrenamientos</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap" id="intensity-legend"></div>
+    </div>
+    <div id="plan-week-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px"></div>
+  </div>
+
+  <!-- Lista detallada -->
+  <div class="card">
+    <div class="chart-header" style="margin-bottom:0">
+      <div class="chart-title">Detalle de entrenos</div>
+      <div class="period-tabs">
+        <button class="period-tab active" onclick="setPlanWeek(0,this)">Esta semana</button>
+        <button class="period-tab" onclick="setPlanWeek(1,this)">Próxima semana</button>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div id="plan-detail-list"></div>
+  </div>
+</section>
+
 </main>
 
 <!-- ══ AI CHAT PANEL ══════════════════════════════════════ -->
@@ -707,12 +838,16 @@ const DEFAULT_SB_KEY = 'sb_publishable_wF7GQv5a369fO3UBfpYqlg_ZmqJf6Vx';
 // ────────────────────────────────────────────────────────────
 
 function loadConfig() {
-  // Credenciales hardcodeadas — proyecto tobin-todo
-  const url = DEFAULT_SB_URL;
-  const key = DEFAULT_SB_KEY;
-  document.getElementById('setup-banner').classList.add('hidden');
-  supabase = window.supabase.createClient(url, key);
-  return true;
+  const url = localStorage.getItem(LS_URL) || DEFAULT_SB_URL;
+  const key = localStorage.getItem(LS_KEY) || DEFAULT_SB_KEY;
+  if (url && key) {
+    document.getElementById('setup-banner').classList.add('hidden');
+    supabase = window.supabase.createClient(url, key);
+    return true;
+  }
+  document.getElementById('sb-url').value = url || '';
+  document.getElementById('sb-key').value = key || '';
+  return false;
 }
 
 function saveConfig() {
@@ -773,34 +908,68 @@ let HABITS  = [];   // daily_habits sorted asc
 let CHAT    = [];   // chat_messages
 
 async function fetchAll() {
-  if (!supabase) {
+  try {
+    const base = DEFAULT_SB_URL;
+    const key  = DEFAULT_SB_KEY;
+    const headers = {
+      'apikey': key,
+      'Authorization': 'Bearer ' + key,
+      'Content-Type': 'application/json'
+    };
+    const [mRes, hRes] = await Promise.all([
+      fetch(base + '/rest/v1/daily_metrics?select=*&order=date.asc&limit=180', {headers}),
+      fetch(base + '/rest/v1/daily_habits?select=*&order=date.asc&limit=90', {headers})
+    ]);
+    if (mRes.ok) {
+      const mData = await mRes.json();
+      METRICS = Array.isArray(mData) && mData.length > 0 ? mData : genDemoMetrics(90);
+    } else {
+      METRICS = genDemoMetrics(90);
+    }
+    if (hRes.ok) {
+      const hData = await hRes.json();
+      HABITS = Array.isArray(hData) && hData.length > 0 ? hData : genDemoHabits(60);
+    } else {
+      HABITS = genDemoHabits(60);
+    }
+  } catch(e) {
+    console.warn('Supabase fetch failed, using demo data:', e.message);
     METRICS = genDemoMetrics(90);
     HABITS  = genDemoHabits(60);
-    return;
   }
-  const [m, h] = await Promise.all([
-    supabase.from('daily_metrics').select('*').order('date', {ascending: true}).limit(180),
-    supabase.from('daily_habits').select('*').order('date', {ascending: true}).limit(90)
-  ]);
-  METRICS = m.data || genDemoMetrics(90);
-  HABITS  = h.data || genDemoHabits(60);
 }
 
 async function loadChatHistory() {
-  if (!supabase) {
+  try {
+    const headers = {
+      'apikey': DEFAULT_SB_KEY,
+      'Authorization': 'Bearer ' + DEFAULT_SB_KEY,
+    };
+    const res = await fetch(DEFAULT_SB_URL + '/rest/v1/chat_messages?select=*&order=created_at.asc&limit=100', {headers});
+    if (res.ok) {
+      const data = await res.json();
+      CHAT = (data || []).map(r => ({role: r.role, content: r.content, time: new Date(r.created_at).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'})}));
+    }
+  } catch(e) {
     CHAT = JSON.parse(localStorage.getItem('tobin_chat') || '[]');
-    return;
   }
-  const {data} = await supabase.from('chat_messages').select('*').order('created_at',{ascending:true}).limit(100);
-  CHAT = (data || []).map(r => ({role: r.role, content: r.content, time: new Date(r.created_at).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'})}));
 }
 
 async function saveChatMsg(role, content) {
   const time = new Date().toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
   CHAT.push({role, content, time});
-  if (supabase) {
-    await supabase.from('chat_messages').insert({role, content});
-  } else {
+  try {
+    const headers = {
+      'apikey': DEFAULT_SB_KEY,
+      'Authorization': 'Bearer ' + DEFAULT_SB_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=minimal'
+    };
+    await fetch(DEFAULT_SB_URL + '/rest/v1/chat_messages', {
+      method: 'POST', headers,
+      body: JSON.stringify({role, content})
+    });
+  } catch(e) {
     localStorage.setItem('tobin_chat', JSON.stringify(CHAT.slice(-80)));
   }
 }
@@ -1275,10 +1444,18 @@ async function saveHabits() {
   const today = new Date().toISOString().split('T')[0];
   const row = { date: today, agua: HF.agua, meditado: HF.med, energia: HF.e, animo: HF.a };
 
-  if (supabase) {
-    const {error} = await supabase.from('daily_habits').upsert(row, {onConflict: 'date'});
-    if (error) { toast('Error al guardar: ' + error.message); return; }
-  } else {
+  try {
+    const headers = {
+      'apikey': DEFAULT_SB_KEY,
+      'Authorization': 'Bearer ' + DEFAULT_SB_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates'
+    };
+    const res = await fetch(DEFAULT_SB_URL + '/rest/v1/daily_habits?on_conflict=date', {
+      method: 'POST', headers, body: JSON.stringify(row)
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+  } catch(e) {
     const existing = HABITS.findIndex(h=>h.date===today);
     if (existing >= 0) HABITS[existing] = row; else HABITS.push(row);
     HABITS.sort((a,b)=>a.date.localeCompare(b.date));
@@ -1371,6 +1548,9 @@ HÁBITOS HOY:
 - Energía percibida: ${lastHabit?.energia||'—'}/100
 - Ánimo: ${lastHabit?.animo||'—'}/100
 
+PLAN:
+${getPlanContext()}
+
 HISTORIAL CHAT: ${CHAT.slice(-6,-1).map(m=>m.role+': '+m.content.substring(0,80)).join(' | ')}`;
 
   try {
@@ -1449,6 +1629,263 @@ document.getElementById('header-date').textContent =
 loadConfig();
 loadChatHistory();
 loadDashboard();
+loadPlan();
+
+// ════════════════════════════════════════════════════════
+//  TRAINING PLAN
+// ════════════════════════════════════════════════════════
+let PLAN = [];      // training_plan rows
+let COACH_CTX = []; // coach_plan_context rows
+
+const ZONE_CONFIG = {
+  'aerobic':   { label: 'Aeróbico',   badge: 'badge-aerobic',   icon: '🏃', bg: '#e6f4ea', color: '#1e8e3e' },
+  'threshold': { label: 'Umbral',     badge: 'badge-threshold', icon: '⚡', bg: '#fef7e0', color: '#f9ab00' },
+  'vo2max':    { label: 'VO2Max',     badge: 'badge-vo2max',    icon: '🔥', bg: '#fce8e6', color: '#d93025' },
+  'recovery':  { label: 'Suave',      badge: 'badge-recovery',  icon: '🌱', bg: '#e8f0fe', color: '#1a73e8' },
+  'rest':      { label: 'Descanso',   badge: 'badge-rest',      icon: '😴', bg: '#f1f3f4', color: '#9aa0a6' },
+  'strength':  { label: 'Fuerza',     badge: 'badge-strength',  icon: '🏋️', bg: '#fbe9e7', color: '#e65100' },
+  'anaerobic': { label: 'Anaeróbico', badge: 'badge-vo2max',    icon: '💨', bg: '#fce8e6', color: '#d93025' },
+};
+
+const TYPE_LABELS = {
+  'run_aerobic':   'Aeróbico',
+  'run_easy':      'Suave',
+  'run_long':      'Long Run',
+  'run_threshold': 'Umbral',
+  'run_tempo':     'Tempo',
+  'run_vo2max':    'VO2Max',
+  'run_intervals': 'Intervalos',
+  'run_race_pace': 'Ritmo Maratón',
+  'strength':      'Fuerza',
+  'rest':          'Descanso',
+  'bike':          'Ciclismo',
+  'swim':          'Natación',
+};
+
+async function fetchPlan() {
+  try {
+    const headers = { 'apikey': DEFAULT_SB_KEY, 'Authorization': 'Bearer ' + DEFAULT_SB_KEY };
+    // Get 14 days of plan
+    const from = new Date(); from.setDate(from.getDate() - 3);
+    const to = new Date(); to.setDate(to.getDate() + 14);
+    const fromStr = from.toISOString().split('T')[0];
+    const toStr = to.toISOString().split('T')[0];
+
+    const [planRes, ctxRes] = await Promise.all([
+      fetch(DEFAULT_SB_URL + `/rest/v1/training_plan?select=*&date=gte.${fromStr}&date=lte.${toStr}&order=date.asc`, {headers}),
+      fetch(DEFAULT_SB_URL + `/rest/v1/coach_plan_context?select=*&order=week_start.desc&limit=2`, {headers})
+    ]);
+
+    if (planRes.ok) {
+      const data = await planRes.json();
+      PLAN = Array.isArray(data) ? data : [];
+    }
+    if (ctxRes.ok) {
+      const data = await ctxRes.json();
+      COACH_CTX = Array.isArray(data) ? data : [];
+    }
+  } catch(e) {
+    console.warn('Plan fetch failed:', e.message);
+  }
+}
+
+function getWeekDays(offsetWeeks) {
+  const days = [];
+  const now = new Date();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (now.getDay() || 7) + 1 + offsetWeeks * 7);
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    days.push(d.toISOString().split('T')[0]);
+  }
+  return days;
+}
+
+function renderPlanKPIs() {
+  const weekDays = getWeekDays(0);
+  const weekPlan = PLAN.filter(p => weekDays.includes(p.date));
+  const ctx = COACH_CTX[0];
+
+  // KPIs
+  const km = weekPlan.reduce((s,p) => s+(p.planned_distance_km||0), 0);
+  document.getElementById('plan-km').textContent = km > 0 ? km.toFixed(1) : '—';
+  document.getElementById('plan-tss').textContent = ctx?.planned_tss_total || weekPlan.reduce((s,p)=>s+(p.planned_tss||0),0) || '—';
+
+  const phaseLabels = {base:'Base 🏗️', build:'Build ⚙️', peak:'Peak 🚀', taper:'Taper 🎯', race:'Race 🏆'};
+  const phase = ctx?.training_phase || weekPlan[0]?.training_phase || '—';
+  document.getElementById('plan-phase').textContent = phaseLabels[phase] || phase;
+  document.getElementById('plan-week-num').textContent = ctx?.week_number ? `Semana ${ctx.week_number}` : 'del plan';
+
+  const keySessions = weekPlan.filter(p => ['vo2max','threshold'].includes(p.intensity_zone) || p.workout_type === 'run_long').length;
+  document.getElementById('plan-key-sessions').textContent = keySessions || '—';
+
+  // Coach notes
+  const notesEl = document.getElementById('coach-notes-text');
+  notesEl.textContent = ctx?.coach_notes || 'Sin notas del coach para esta semana.';
+
+  const chipsEl = document.getElementById('coach-week-chips');
+  const chips = [];
+  if (ctx?.weekly_focus) chips.push(`<span class="chip blue">${ctx.weekly_focus}</span>`);
+  if (ctx?.planned_km_total) chips.push(`<span class="chip">📏 ${ctx.planned_km_total}km planificados</span>`);
+  if (ctx?.training_phase) chips.push(`<span class="chip ${phase==='taper'?'green':phase==='peak'?'orange':''}">${phaseLabels[phase]||phase}</span>`);
+  chipsEl.innerHTML = chips.join('');
+}
+
+function renderWeekGrid(offsetWeeks) {
+  const weekDays = getWeekDays(offsetWeeks);
+  const dayNames = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  const today = new Date().toISOString().split('T')[0];
+  const grid = document.getElementById('plan-week-grid');
+
+  grid.innerHTML = weekDays.map((dateStr, i) => {
+    const workout = PLAN.find(p => p.date === dateStr);
+    const isToday = dateStr === today;
+    const zone = workout?.intensity_zone || 'rest';
+    const cfg = ZONE_CONFIG[zone] || ZONE_CONFIG['rest'];
+    const d = new Date(dateStr + 'T12:00:00');
+    const dateLabel = d.toLocaleDateString('es',{day:'numeric',month:'short'});
+
+    const distLabel = workout?.planned_distance_km ? `${workout.planned_distance_km}km` :
+                      workout?.planned_duration_min ? `${workout.planned_duration_min}min` : '';
+
+    return `<div class="plan-day" onclick="scrollToPlanDetail('${dateStr}')">
+      <div class="plan-day-card ${isToday?'today':''} ${zone==='rest'?'rest':''}" 
+           style="border-color:${isToday?'var(--blue)':cfg.color+'40'};background:${cfg.bg}20">
+        <div class="day-label">${dayNames[i]}</div>
+        <div class="day-date">${dateLabel}</div>
+        <div class="day-icon">${cfg.icon}</div>
+        <div class="day-type" style="color:${cfg.color}">${workout ? (TYPE_LABELS[workout.workout_type]||workout.workout_type) : 'Libre'}</div>
+        <div class="day-dist" style="color:${cfg.color}">${distLabel}</div>
+        ${isToday ? '<div style="width:6px;height:6px;border-radius:50%;background:var(--blue);margin-top:4px"></div>' : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Legend
+  const zones = [...new Set(PLAN.filter(p=>weekDays.includes(p.date)).map(p=>p.intensity_zone))].filter(Boolean);
+  const legend = document.getElementById('intensity-legend');
+  legend.innerHTML = zones.map(z => {
+    const cfg = ZONE_CONFIG[z] || ZONE_CONFIG['rest'];
+    return `<span class="intensity-badge ${cfg.badge}">${cfg.icon} ${cfg.label}</span>`;
+  }).join('');
+}
+
+function renderPlanDetail(offsetWeeks) {
+  const weekDays = getWeekDays(offsetWeeks);
+  const weekPlan = PLAN.filter(p => weekDays.includes(p.date));
+  const today = new Date().toISOString().split('T')[0];
+  const list = document.getElementById('plan-detail-list');
+
+  if (weekPlan.length === 0) {
+    list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-hint);font-size:14px">Sin entrenamientos planificados esta semana.<br>Agrega tu plan desde TrainingPeaks o manualmente en Supabase.</div>';
+    return;
+  }
+
+  list.innerHTML = weekPlan.map(w => {
+    const zone = w.intensity_zone || 'aerobic';
+    const cfg = ZONE_CONFIG[zone] || ZONE_CONFIG['aerobic'];
+    const d = new Date(w.date + 'T12:00:00');
+    const dateLabel = d.toLocaleDateString('es',{weekday:'long',day:'numeric',month:'short'});
+    const isToday = w.date === today;
+
+    const paceStr = sec => {
+      if (!sec) return null;
+      return Math.floor(sec/60)+':'+(sec%60).toString().padStart(2,'0')+'/km';
+    };
+
+    const stats = [];
+    if (w.planned_distance_km) stats.push({val: w.planned_distance_km.toFixed(1)+' km', label: 'distancia'});
+    if (w.planned_duration_min) stats.push({val: w.planned_duration_min+' min', label: 'duración'});
+    if (w.planned_pace_sec) stats.push({val: paceStr(w.planned_pace_sec), label: 'ritmo objetivo'});
+    if (w.planned_tss) stats.push({val: w.planned_tss+' TSS', label: 'carga'});
+
+    return `<div class="plan-detail-row" id="plan-${w.date}" ${isToday?'style="background:var(--blue-light);margin:0 -20px;padding:14px 20px;border-radius:8px"':''}>
+      <div class="plan-detail-icon" style="background:${cfg.bg}">${cfg.icon}</div>
+      <div class="plan-detail-info">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="plan-detail-title">${w.title}</div>
+          <span class="intensity-badge ${cfg.badge}">${cfg.label}</span>
+          ${isToday ? '<span class="chip blue">HOY</span>' : ''}
+        </div>
+        <div style="font-size:12px;color:var(--text-hint);margin-top:2px">${dateLabel} · ${w.week_day||''}</div>
+        ${w.description ? `<div class="plan-detail-desc">${w.description.substring(0,200)}${w.description.length>200?'…':''}</div>` : ''}
+        <div class="plan-detail-meta">
+          ${stats.map(s => `<span class="chip"><strong>${s.val}</strong> ${s.label}</span>`).join('')}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function scrollToPlanDetail(dateStr) {
+  const el = document.getElementById('plan-'+dateStr);
+  if (el) el.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+let currentPlanWeek = 0;
+function setPlanWeek(offset, btn) {
+  btn.closest('.period-tabs').querySelectorAll('.period-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  currentPlanWeek = offset;
+  renderWeekGrid(offset);
+  renderPlanDetail(offset);
+}
+
+async function loadPlan() {
+  await fetchPlan();
+  renderPlanKPIs();
+  renderWeekGrid(0);
+  renderPlanDetail(0);
+}
+
+// ── Enriquecer contexto del coach IA con el plan ──────────────────────────
+function getPlanContext() {
+  if (PLAN.length === 0) return 'Sin plan cargado en Supabase.';
+  
+  const today = new Date().toISOString().split('T')[0];
+  const weekDays = getWeekDays(0);
+  const weekPlan = PLAN.filter(p => weekDays.includes(p.date));
+  const todayWorkout = PLAN.find(p => p.date === today);
+  const ctx = COACH_CTX[0];
+
+  const zoneCount = {};
+  weekPlan.forEach(p => { zoneCount[p.intensity_zone] = (zoneCount[p.intensity_zone]||0)+1; });
+
+  const paceStr = sec => sec ? Math.floor(sec/60)+':'+(sec%60).toString().padStart(2,'0')+'/km' : 'N/A';
+
+  return `
+PLAN DE ENTRENAMIENTO (TrainingPeaks):
+Fase: ${ctx?.training_phase || weekPlan[0]?.training_phase || 'N/A'} | Semana: ${ctx?.week_number || 'N/A'}
+Enfoque semanal: ${ctx?.weekly_focus || 'N/A'}
+Nota del coach: ${ctx?.coach_notes?.substring(0,200) || 'Sin notas'}
+
+COMPOSICIÓN DE LA SEMANA:
+${Object.entries(zoneCount).map(([z,n]) => `- ${ZONE_CONFIG[z]?.label||z}: ${n} sesión(es)`).join('
+')}
+KMs planificados: ${weekPlan.reduce((s,p)=>s+(p.planned_distance_km||0),0).toFixed(1)}km
+TSS planificado: ${ctx?.planned_tss_total || weekPlan.reduce((s,p)=>s+(p.planned_tss||0),0)}
+
+ENTRENAMIENTOS ESTA SEMANA:
+${weekPlan.map(w => 
+  `• ${w.week_day} - ${w.title} [${ZONE_CONFIG[w.intensity_zone]?.label||w.intensity_zone}]${w.planned_distance_km?' - '+w.planned_distance_km+'km':''}${w.planned_pace_sec?' @ '+paceStr(w.planned_pace_sec):''}`
+).join('
+')}
+
+HOY:
+${todayWorkout ? 
+  `• ${todayWorkout.title} [${ZONE_CONFIG[todayWorkout.intensity_zone]?.label}] - ${todayWorkout.description?.substring(0,200)||''}` : 
+  'Sin entreno planificado para hoy'}
+
+TIPOS DE ENTRENO EN EL PLAN (para entender la periodización):
+- AERÓBICO: Zona 2, base de resistencia, FC 130-145, conversación fácil
+- SUAVE/RECOVERY: Zona 1, recuperación activa, FC <135
+- LONG RUN: Rodaje largo aeróbico, 2h+, base de maratón
+- UMBRAL: Zona 3-4, ritmo maratón/medio maratón, FC 155-165
+- VO2MAX: Zona 5, intervalos intensos 5K, FC >170
+- FUERZA: Sin impacto, complementario al running`;
+}
+
 </script>
 </body>
 </html>

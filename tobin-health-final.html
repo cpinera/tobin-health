@@ -825,17 +825,17 @@ input[type=range] {
 
 <!-- ══ SCRIPT ══════════════════════════════════════════════ -->
 <script>
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 //  CONFIG & SUPABASE
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 const LS_URL = 'tobin_sb_url';
 const LS_KEY = 'tobin_sb_key';
 let supabase = null;
 
-// ── Credenciales de tu proyecto tobin-todo ──────────────────
+// -- Credenciales de tu proyecto tobin-todo ------------------
 const DEFAULT_SB_URL = 'https://hnlhmjykovmzgnkepcfa.supabase.co';
 const DEFAULT_SB_KEY = 'sb_publishable_wF7GQv5a369fO3UBfpYqlg_ZmqJf6Vx';
-// ────────────────────────────────────────────────────────────
+// ------------------------------------------------------------
 
 function loadConfig() {
   const url = localStorage.getItem(LS_URL) || DEFAULT_SB_URL;
@@ -862,9 +862,9 @@ function saveConfig() {
   loadDashboard();
 }
 
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 //  DEMO DATA (used if Supabase not configured)
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 function genDemoMetrics(days) {
   const rows = [];
   for (let i = days; i >= 0; i--) {
@@ -900,9 +900,9 @@ function genDemoHabits(days) {
   });
 }
 
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 //  DATA FETCHING
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 let METRICS = [];   // daily_metrics sorted asc
 let HABITS  = [];   // daily_habits sorted asc
 let CHAT    = [];   // chat_messages
@@ -974,9 +974,9 @@ async function saveChatMsg(role, content) {
   }
 }
 
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 //  AGGREGATION HELPERS
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 function weekStart(dateStr) {
   const d = new Date(dateStr + 'T12:00:00');
   const day = d.getDay(); // 0=Sun
@@ -1025,9 +1025,9 @@ function paceStr(sec) {
   return m+':'+s;
 }
 
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 //  CHART DEFAULTS
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 Chart.defaults.font.family = "'Google Sans', sans-serif";
 Chart.defaults.font.size = 11;
 
@@ -1093,9 +1093,9 @@ function makeChart(id, type, data, opts) {
   return CHARTS[id];
 }
 
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 //  CHART DATA BUILDERS (period-aware)
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 const CHART_DATA = {};  // cache computed series
 
 function buildAllSeries() {
@@ -1125,9 +1125,9 @@ function periodsToWeeks(p) {
 function sliceWeeks(arr, weeks) { return last(arr, weeks); }
 function sliceDays(arr, days) { return last(arr, days); }
 
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 //  DRAW CHARTS
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 function drawRecChart(period='4w') {
   const n = periodsToWeeks(period);
   const rec = sliceWeeks(CHART_DATA.rec.recWeekly, n);
@@ -1239,9 +1239,9 @@ function setP(chartId, period, btn) {
   ({ rec: drawRecChart, hrv: drawHrvChart, vo2: drawVo2Chart, km: drawKmChart })[chartId]?.(period);
 }
 
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 //  KPI CARDS
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 function updateKPIs() {
   const today = METRICS[METRICS.length - 1];
   const prev  = METRICS[METRICS.length - 2];
@@ -1291,9 +1291,9 @@ function updateKPIs() {
   }
 }
 
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 //  TRAINING TAB
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 function updateTraining() {
   // This week's data
   const mon = weekStart(new Date().toISOString().split('T')[0]);
@@ -1383,9 +1383,9 @@ function updateTraining() {
   }
 }
 
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 //  HABITS TAB
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 function updateHabits() {
   document.getElementById('habit-today-label').textContent =
     new Date().toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long'});
@@ -1417,9 +1417,9 @@ function updateHabits() {
   }
 }
 
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 //  HABITS FORM STATE
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 let HF = {agua: null, med: false, e: 50, a: 50};
 
 function selWater(v, el) {
@@ -1467,9 +1467,9 @@ async function saveHabits() {
   updateHabits();
 }
 
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 //  CHAT
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 let chatOpen = false;
 
 function toggleChat() {
@@ -1587,9 +1587,9 @@ REGLAS:
   document.getElementById('chat-btn').disabled = false;
 }
 
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 //  NAVIGATION
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 function nav(id, btn) {
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
@@ -1597,18 +1597,18 @@ function nav(id, btn) {
   btn.classList.add('active');
 }
 
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 //  TOAST
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 function toast(msg) {
   const el = document.getElementById('toast');
   el.textContent = msg; el.classList.add('show');
   setTimeout(()=>el.classList.remove('show'), 2800);
 }
 
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 //  INIT
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 async function loadDashboard() {
   await fetchAll();
   buildAllSeries();
@@ -1631,9 +1631,9 @@ loadChatHistory();
 loadDashboard();
 loadPlan();
 
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 //  TRAINING PLAN
-// ════════════════════════════════════════════════════════
+// --------------------------------------------------------
 let PLAN = [];      // training_plan rows
 let COACH_CTX = []; // coach_plan_context rows
 
@@ -1839,7 +1839,7 @@ async function loadPlan() {
   renderPlanDetail(0);
 }
 
-// ── Enriquecer contexto del coach IA con el plan ──────────────────────────
+// -- Enriquecer contexto del coach IA con el plan --------------------------
 function getPlanContext() {
   if (PLAN.length === 0) return 'Sin plan cargado en Supabase.';
   
@@ -1861,16 +1861,14 @@ Enfoque semanal: ${ctx?.weekly_focus || 'N/A'}
 Nota del coach: ${ctx?.coach_notes?.substring(0,200) || 'Sin notas'}
 
 COMPOSICIÓN DE LA SEMANA:
-${Object.entries(zoneCount).map(([z,n]) => `- ${ZONE_CONFIG[z]?.label||z}: ${n} sesión(es)`).join('
-')}
+${Object.entries(zoneCount).map(([z,n]) => `- ${ZONE_CONFIG[z]?.label||z}: ${n} sesión(es)`).join('\\n')}
 KMs planificados: ${weekPlan.reduce((s,p)=>s+(p.planned_distance_km||0),0).toFixed(1)}km
 TSS planificado: ${ctx?.planned_tss_total || weekPlan.reduce((s,p)=>s+(p.planned_tss||0),0)}
 
 ENTRENAMIENTOS ESTA SEMANA:
 ${weekPlan.map(w => 
   `• ${w.week_day} - ${w.title} [${ZONE_CONFIG[w.intensity_zone]?.label||w.intensity_zone}]${w.planned_distance_km?' - '+w.planned_distance_km+'km':''}${w.planned_pace_sec?' @ '+paceStr(w.planned_pace_sec):''}`
-).join('
-')}
+).join('\\n')}
 
 HOY:
 ${todayWorkout ? 

@@ -387,6 +387,7 @@ input[type=range] {
   nav { gap: 0; }
   .nav-btn { padding: 8px 12px; font-size: 13px; }
 }
+.plan-day-card{border-radius:8px;padding:12px 10px;text-align:center;border:1.5px solid var(--border);background:var(--surface);transition:transform 0.12s;cursor:pointer;min-height:110px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}.plan-day-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}.plan-day-card.today{border-color:var(--blue);background:var(--blue-light)}.intensity-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:600}.badge-aerobic{background:#e6f4ea;color:#1e8e3e}.badge-threshold{background:#fef7e0;color:#f9ab00}.badge-vo2max{background:#fce8e6;color:#d93025}.badge-recovery{background:#e8f0fe;color:#1a73e8}.badge-rest{background:var(--surface-2);color:var(--text-hint)}.badge-strength{background:#fbe9e7;color:#e65100}.plan-detail-row{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--border-light);align-items:flex-start}.plan-detail-row:last-child{border-bottom:none}.plan-detail-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}.plan-detail-title{font-size:14px;font-weight:600}.plan-detail-desc{font-size:12px;color:var(--text-secondary);margin-top:4px;line-height:1.5}.plan-detail-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 </style>
 </head>
 <body>
@@ -402,6 +403,7 @@ input[type=range] {
       <button class="nav-btn active" onclick="nav('dashboard', this)"><span class="icon">📊</span> Dashboard</button>
       <button class="nav-btn" onclick="nav('training', this)"><span class="icon">🏋️</span> Entrenos</button>
       <button class="nav-btn" onclick="nav('habits', this)"><span class="icon">✅</span> Hábitos</button>
+      <button class="nav-btn" onclick="nav('plan', this)"><span class="icon">📋</span> Plan</button>
     </nav>
     <div class="header-date" id="header-date"></div>
   </div>
@@ -669,6 +671,19 @@ input[type=range] {
   </div>
 </section>
 
+
+<section id="s-plan" class="section">
+  <div class="section-header"><h1>Plan de entrenamiento</h1><p id="plan-subtitle">Maratón Hamburgo — 26 Abril · 6 semanas</p></div>
+  <div class="card" style="margin-bottom:16px;border-left:4px solid var(--blue)"><div style="display:flex;align-items:flex-start;gap:14px"><div style="font-size:28px">👨‍💼</div><div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px">Nota del coach</div><div id="coach-notes-text" style="font-size:14px;line-height:1.6">Cargando…</div><div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap" id="coach-week-chips"></div></div></div></div>
+  <div class="row cols-4">
+    <div class="card metric-card"><div class="metric-label"><div class="dot" style="background:#1a73e8"></div>KMs plan</div><div class="metric-value" id="plan-km">—</div><div class="metric-unit">esta semana</div></div>
+    <div class="card metric-card"><div class="metric-label"><div class="dot" style="background:#e65100"></div>TSS plan</div><div class="metric-value" id="plan-tss">—</div><div class="metric-unit">carga semanal</div></div>
+    <div class="card metric-card"><div class="metric-label"><div class="dot" style="background:#7c4dff"></div>Fase</div><div class="metric-value" id="plan-phase" style="font-size:20px">—</div><div class="metric-unit" id="plan-week-num">del plan</div></div>
+    <div class="card metric-card"><div class="metric-label"><div class="dot" style="background:#1e8e3e"></div>Sesiones clave</div><div class="metric-value" id="plan-key-sessions">—</div><div class="metric-unit">VO2Max+Umbral+Long</div></div>
+  </div>
+  <div class="card" style="margin-bottom:16px"><div class="chart-header" style="margin-bottom:16px"><div class="chart-title">Semana visual</div><div id="intensity-legend" style="display:flex;gap:6px;flex-wrap:wrap"></div></div><div id="plan-week-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px"></div></div>
+  <div class="card"><div class="chart-header" style="margin-bottom:0"><div class="chart-title">Detalle de entrenos</div><div class="period-tabs"><button class="period-tab active" onclick="setPlanWeek(0,this)">Esta semana</button><button class="period-tab" onclick="setPlanWeek(1,this)">Próxima</button></div></div><div class="divider"></div><div id="plan-detail-list"></div></div>
+</section>
 </main>
 
 <!-- ══ AI CHAT PANEL ══════════════════════════════════════ -->
@@ -1371,6 +1386,9 @@ HÁBITOS HOY:
 - Energía percibida: ${lastHabit?.energia||'—'}/100
 - Ánimo: ${lastHabit?.animo||'—'}/100
 
+PLAN:
+${getPlanContext()}
+
 HISTORIAL CHAT: ${CHAT.slice(-6,-1).map(m=>m.role+': '+m.content.substring(0,80)).join(' | ')}`;
 
   try {
@@ -1449,6 +1467,24 @@ document.getElementById('header-date').textContent =
 loadConfig();
 loadChatHistory();
 loadDashboard();
+loadPlan();
+
+const ZCFG={aerobic:{l:'Aeróbico',b:'badge-aerobic',i:'🏃',bg:'#e6f4ea',c:'#1e8e3e'},threshold:{l:'Umbral',b:'badge-threshold',i:'⚡',bg:'#fef7e0',c:'#f9ab00'},vo2max:{l:'VO2Max',b:'badge-vo2max',i:'🔥',bg:'#fce8e6',c:'#d93025'},recovery:{l:'Suave',b:'badge-recovery',i:'🌱',bg:'#e8f0fe',c:'#1a73e8'},rest:{l:'Descanso',b:'badge-rest',i:'😴',bg:'#f1f3f4',c:'#9aa0a6'},strength:{l:'Fuerza',b:'badge-strength',i:'🏋️',bg:'#fbe9e7',c:'#e65100'}};
+const TLBL={run_aerobic:'Aeróbico',run_easy:'Suave',run_long:'Long Run',run_threshold:'Umbral',run_vo2max:'VO2Max',run_intervals:'Intervalos',run_race_pace:'Ritmo Maratón',strength:'Fuerza',rest:'Descanso'};
+let PLAN=[],CCTX=[];
+async function fetchPlan(){try{const h={'apikey':DEFAULT_SB_KEY,'Authorization':'Bearer '+DEFAULT_SB_KEY};const f=new Date();f.setDate(f.getDate()-7);const t=new Date();t.setDate(t.getDate()+14);const[pr,cr]=await Promise.all([fetch(DEFAULT_SB_URL+'/rest/v1/training_plan?select=*&date=gte.'+f.toISOString().split('T')[0]+'&date=lte.'+t.toISOString().split('T')[0]+'&order=date.asc',{headers:h}),fetch(DEFAULT_SB_URL+'/rest/v1/coach_plan_context?select=*&order=week_start.desc&limit=2',{headers:h})]);if(pr.ok){const d=await pr.json();PLAN=Array.isArray(d)?d:[];}if(cr.ok){const d=await cr.json();CCTX=Array.isArray(d)?d:[];}}catch(e){console.warn('plan:',e.message);}}
+function gwd(o){const d=[];const n=new Date();const m=new Date(n);m.setDate(n.getDate()-(n.getDay()||7)+1+o*7);for(let i=0;i<7;i++){const x=new Date(m);x.setDate(m.getDate()+i);d.push(x.toISOString().split('T')[0]);}return d;}
+function renderPlanKPIs(){const wd=gwd(0);const wp=PLAN.filter(p=>wd.includes(p.date));const ctx=CCTX[0];const km=wp.reduce((s,p)=>s+(p.planned_distance_km||0),0);document.getElementById('plan-km').textContent=km>0?km.toFixed(1):'—';document.getElementById('plan-tss').textContent=ctx?.planned_tss_total||wp.reduce((s,p)=>s+(p.planned_tss||0),0)||'—';const ph={base:'Base 🏗️',build:'Build ⚙️',peak:'Peak 🚀',taper:'Taper 🎯'};const phase=ctx?.training_phase||wp[0]?.training_phase||'—';document.getElementById('plan-phase').textContent=ph[phase]||phase;document.getElementById('plan-week-num').textContent=ctx?.week_number?'Semana '+ctx.week_number:'del plan';document.getElementById('plan-key-sessions').textContent=wp.filter(p=>['vo2max','threshold'].includes(p.intensity_zone)||p.workout_type==='run_long').length||'—';document.getElementById('coach-notes-text').textContent=ctx?.coach_notes||'Sin notas.';document.getElementById('coach-week-chips').innerHTML=(ctx?.weekly_focus?'<span class="chip blue">'+ctx.weekly_focus+'</span>':'')+(ctx?.planned_km_total?'<span class="chip">📏 '+ctx.planned_km_total+'km</span>':'');}
+function renderWeekGrid(o){const wd=gwd(o);const td=new Date().toISOString().split('T')[0];const dn=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];document.getElementById('plan-week-grid').innerHTML=wd.map((ds,i)=>{const w=PLAN.find(p=>p.date===ds);const z=w?.intensity_zone||'rest';const cfg=ZCFG[z]||ZCFG.rest;const dl=new Date(ds+'T12:00:00').toLocaleDateString('es',{day:'numeric',month:'short'});const dist=w?.planned_distance_km?w.planned_distance_km+'km':w?.planned_duration_min?w.planned_duration_min+'min':'';const isT=ds===td;return '<div><div class="plan-day-card '+(isT?'today':'')+'" style="border-color:'+(isT?'var(--blue)':cfg.c+'40')+';background:'+cfg.bg+'20"><div style="font-size:10px;font-weight:600;color:var(--text-hint);text-transform:uppercase">'+dn[i]+'</div><div style="font-size:11px;color:var(--text-secondary)">'+dl+'</div><div style="font-size:22px;margin:4px 0">'+cfg.i+'</div><div style="font-size:10px;font-weight:600;color:'+cfg.c+'">'+( w?(TLBL[w.workout_type]||w.workout_type):'Libre')+'</div><div style="font-size:11px;color:'+cfg.c+'">'+dist+'</div>'+(isT?'<div style="width:6px;height:6px;border-radius:50%;background:var(--blue);margin-top:4px"></div>':'')+'</div></div>';}).join('');const zones=[...new Set(PLAN.filter(p=>wd.includes(p.date)).map(p=>p.intensity_zone))].filter(Boolean);document.getElementById('intensity-legend').innerHTML=zones.map(z=>{const cfg=ZCFG[z]||ZCFG.rest;return '<span class="intensity-badge '+cfg.b+'">'+cfg.i+' '+cfg.l+'</span>';}).join('');}
+function renderPlanDetail(o){const wd=gwd(o);const wp=PLAN.filter(p=>wd.includes(p.date));const td=new Date().toISOString().split('T')[0];const el=document.getElementById('plan-detail-list');if(!wp.length){el.innerHTML='<div style="padding:24px;text-align:center;color:var(--text-hint)">Sin entrenamientos planificados esta semana.</div>';return;}const ps=s=>s?Math.floor(s/60)+':'+(s%60).toString().padStart(2,'0')+'/km':null;el.innerHTML=wp.map(w=>{const z=w.intensity_zone||'aerobic';const cfg=ZCFG[z]||ZCFG.aerobic;const dl=new Date(w.date+'T12:00:00').toLocaleDateString('es',{weekday:'long',day:'numeric',month:'short'});const isT=w.date===td;const st=[];if(w.planned_distance_km)st.push('<span class="chip"><strong>'+w.planned_distance_km.toFixed(1)+'km</strong></span>');if(w.planned_duration_min)st.push('<span class="chip"><strong>'+w.planned_duration_min+'min</strong></span>');if(w.planned_pace_sec)st.push('<span class="chip"><strong>'+ps(w.planned_pace_sec)+'</strong></span>');if(w.planned_tss)st.push('<span class="chip"><strong>'+w.planned_tss+' TSS</strong></span>');return '<div class="plan-detail-row" '+(isT?'style="background:var(--blue-light);margin:0 -20px;padding:14px 20px;border-radius:8px"':'')+'>'+
+'<div class="plan-detail-icon" style="background:'+cfg.bg+'">'+cfg.i+'</div>'+
+'<div style="flex:1"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div class="plan-detail-title">'+w.title+'</div><span class="intensity-badge '+cfg.b+'">'+cfg.l+'</span>'+(isT?'<span class="chip blue">HOY</span>':'')+
+'</div><div style="font-size:12px;color:var(--text-hint);margin-top:2px">'+dl+'</div>'+
+(w.description?'<div class="plan-detail-desc">'+w.description.substring(0,200)+(w.description.length>200?'…':'')+'</div>':'')+
+'<div class="plan-detail-meta">'+st.join('')+'</div></div></div>';}).join('');}
+function setPlanWeek(o,btn){btn.closest('.period-tabs').querySelectorAll('.period-tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderWeekGrid(o);renderPlanDetail(o);}
+async function loadPlan(){await fetchPlan();renderPlanKPIs();renderWeekGrid(0);renderPlanDetail(0);}
+function getPlanContext(){if(!PLAN.length)return 'Sin plan cargado en Supabase.';const td=new Date().toISOString().split('T')[0];const wd=gwd(0);const wp=PLAN.filter(p=>wd.includes(p.date));const ctx=CCTX[0];const tw=PLAN.find(p=>p.date===td);const zc={};wp.forEach(p=>{zc[p.intensity_zone]=(zc[p.intensity_zone]||0)+1;});const ps=s=>s?Math.floor(s/60)+':'+(s%60).toString().padStart(2,'0')+'/km':'N/A';return 'PLAN TrainingPeaks - Maratón Hamburgo 26 Abril:\nFase: '+(ctx?.training_phase||'N/A')+' Semana: '+(ctx?.week_number||'N/A')+'\nNota coach: '+(ctx?.coach_notes?.substring(0,150)||'N/A')+'\nComposición: '+Object.entries(zc).map(([z,n])=>(ZCFG[z]?.l||z)+':'+n).join(', ')+'\nKMs: '+wp.reduce((s,p)=>s+(p.planned_distance_km||0),0).toFixed(1)+'\nHoy: '+(tw?tw.title+' ['+( ZCFG[tw.intensity_zone]?.l||tw.intensity_zone)+'] '+( tw.description?.substring(0,100)||''):'Sin entreno')+'\n'+wp.map(w=>'• '+w.week_day+': '+w.title+' ['+(ZCFG[w.intensity_zone]?.l||w.intensity_zone)+']'+(w.planned_distance_km?' '+w.planned_distance_km+'km':'')).join('\n');}
 </script>
 </body>
 </html>

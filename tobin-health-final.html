@@ -1623,14 +1623,22 @@ async function loadDashboard() {
   drawHabitsChart('4w');
 }
 
-document.getElementById('header-date').textContent =
-  new Date().toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+// Wait for all external scripts then init
+function _initDashboard() {
+  document.getElementById('header-date').textContent =
+    new Date().toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  loadConfig();
+  loadChatHistory();
+  loadDashboard();
+  loadPlan();
+  setTimeout(loadHabits, 2000);
+}
 
-loadConfig();
-loadChatHistory();
-loadDashboard();
-loadPlan();
-setTimeout(loadHabits, 2000);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', _initDashboard);
+} else {
+  _initDashboard();
+}
 
 // --------------------------------------------------------
 //  TRAINING PLAN

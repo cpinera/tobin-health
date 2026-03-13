@@ -1028,8 +1028,7 @@ function paceStr(sec) {
 // --------------------------------------------------------
 //  CHART DEFAULTS
 // --------------------------------------------------------
-Chart.defaults.font.family = "'Google Sans', sans-serif";
-Chart.defaults.font.size = 11;
+// Chart defaults set in _initDashboard
 
 const GRID_COLOR = 'rgba(0,0,0,0.05)';
 const TICK_COLOR = '#9aa0a6';
@@ -1625,6 +1624,11 @@ async function loadDashboard() {
 
 // Wait for all external scripts then init
 function _initDashboard() {
+  // Init Chart.js defaults
+  if (typeof Chart !== 'undefined') {
+    Chart.defaults.font.family = "'Google Sans', sans-serif";
+    Chart.defaults.font.size = 11;
+  }
   document.getElementById('header-date').textContent =
     new Date().toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   loadConfig();
@@ -1634,10 +1638,18 @@ function _initDashboard() {
   setTimeout(loadHabits, 2000);
 }
 
+function _safeInit() {
+  try {
+    _initDashboard();
+  } catch(e) {
+    console.error('Dashboard init error:', e);
+    document.getElementById('dash-subtitle').textContent = 'Error: ' + e.message;
+  }
+}
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', _initDashboard);
+  document.addEventListener('DOMContentLoaded', _safeInit);
 } else {
-  _initDashboard();
+  _safeInit();
 }
 
 // --------------------------------------------------------

@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tobin Health</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=Google+Sans+Text:wght@400;500&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ══ TOKENS ══════════════════════════════════════════════════ */
+:root {
+  --bg: #f8f9fa;
+  --surface: #ffffff;
+  --surface-2: #f1f3f4;
+  --border: #e0e0e0;
+  --border-light: #f0f0f0;
+  --text-primary: #202124;
+  --text-secondary: #5f6368;
+  --text-hint: #9aa0a6;
+
+  --blue: #1a73e8;
+  --blue-light: #e8f0fe;
+  --green: #1e8e3e;
+  --green-light: #e6f4ea;
+  --red: #d93025;
+  --red-light: #fce8e6;
+  --yellow: #f9ab00;
+  --yellow-light: #fef7e0;
+  --teal: #009688;
+  --teal-light: #e0f2f1;
+  --purple: #7c4dff;
+  --purple-light: #ede7f6;
+  --orange: #e65100;
+  --orange-light: #fbe9e7;
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-card: 0 1px 2px rgba(60,64,67,0.3), 0 2px 6px rgba(60,64,67,0.15);
+  --radius: 12px;
+  --radius-sm: 8px;
+
+  --font: 'Google Sans', 'Segoe UI', sans-serif;
+  --font-text: 'Google Sans Text', sans-serif;
+  --font-mono: 'Roboto Mono', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text-primary); font-family: var(--font); min-height: 100vh; }
+
+/* ══ HEADER ══════════════════════════════════════════════════ */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+}
+.header-inner {
+  max-width: 1280px; margin: 0 auto;
+  display: flex; align-items: center; gap: 24px;
+  padding: 0 24px; height: 64px;
+}
+.logo {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 18px; font-weight: 600; color: var(--text-primary);
+  white-space: nowrap;
+}
+.logo-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: var(--blue); display: flex; align-items: center;
+  justify-content: center; color: white; font-size: 16px;
+}
+nav { display: flex; gap: 4px; flex: 1; }
+.nav-btn {
+  padding: 8px 20px; border-radius: 20px;
+  font-family: var(--font); font-size: 14px; font-weight: 500;
+  color: var(--text-secondary); border: none; background: transparent;
+  cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px;
+}
+.nav-btn:hover { background: var(--surface-2); color: var(--text-primary); }
+.nav-btn.active { background: var(--blue-light); color: var(--blue); }
+.nav-btn .icon { font-size: 16px; }
+.header-date { margin-left: auto; font-size: 13px; color: var(--text-hint); white-space: nowrap; }
+
+/* ══ SETUP BANNER ══════════════════════════════════════════ */
+.setup-banner {
+  background: var(--yellow-light); border: 1px solid #f9ab0040;
+  border-radius: var(--radius); padding: 14px 20px;
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 20px; font-size: 14px;
+}
+.setup-banner.hidden { display: none; }
+.setup-banner strong { color: var(--orange); }
+.setup-fields { display: flex; gap: 10px; flex: 1; flex-wrap: wrap; }
+.setup-input {
+  flex: 1; min-width: 200px; padding: 8px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: 12px; color: var(--text-primary);
+  background: white; outline: none;
+}
+.setup-input:focus { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+.setup-save {
+  padding: 8px 20px; background: var(--blue); color: white;
+  border: none; border-radius: 20px; font-family: var(--font);
+  font-size: 14px; font-weight: 500; cursor: pointer;
+  white-space: nowrap; transition: background 0.15s;
+}
+.setup-save:hover { background: #1557b0; }
+
+/* ══ MAIN ══════════════════════════════════════════════════ */
+main { max-width: 1280px; margin: 0 auto; padding: 24px 24px 180px; }
+.section { display: none; }
+.section.active { display: block; animation: fadeUp 0.25s ease; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+
+/* ══ SECTION HEADER ════════════════════════════════════════ */
+.section-header { margin-bottom: 20px; }
+.section-header h1 { font-size: 22px; font-weight: 600; color: var(--text-primary); }
+.section-header p { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }
+
+/* ══ GRID ════════════════════════════════════════════════ */
+.row { display: grid; gap: 16px; margin-bottom: 16px; }
+.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.cols-2-1 { grid-template-columns: 2fr 1fr; }
+.cols-1-2 { grid-template-columns: 1fr 2fr; }
+
+/* ══ CARD ════════════════════════════════════════════════ */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px;
+  box-shadow: var(--shadow-sm); transition: box-shadow 0.15s;
+}
+.card:hover { box-shadow: var(--shadow-card); }
+
+/* Metric card */
+.metric-card { display: flex; flex-direction: column; gap: 6px; min-height: 100px; }
+.metric-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); letter-spacing: 0.3px; display: flex; align-items: center; gap: 6px; }
+.metric-label .dot { width: 8px; height: 8px; border-radius: 50%; }
+.metric-value { font-size: 32px; font-weight: 600; line-height: 1.1; color: var(--text-primary); }
+.metric-unit { font-size: 13px; color: var(--text-hint); }
+.metric-delta { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; margin-top: 4px; }
+.delta-pos { background: var(--green-light); color: var(--green); }
+.delta-neg { background: var(--red-light); color: var(--red); }
+.delta-neu { background: var(--yellow-light); color: var(--yellow); }
+
+/* Recovery semaforo pill */
+.recovery-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;
+}
+.pill-green { background: var(--green-light); color: var(--green); }
+.pill-yellow { background: var(--yellow-light); color: var(--yellow); }
+.pill-red { background: var(--red-light); color: var(--red); }
+
+/* Chart card */
+.chart-card { padding: 20px; }
+.chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.chart-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.chart-subtitle { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.period-tabs { display: flex; gap: 2px; background: var(--surface-2); padding: 3px; border-radius: 20px; }
+.period-tab {
+  padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 500;
+  color: var(--text-secondary); border: none; background: transparent;
+  cursor: pointer; transition: all 0.15s;
+}
+.period-tab.active { background: var(--surface); color: var(--text-primary); box-shadow: var(--shadow-sm); }
+canvas { width: 100% !important; max-height: 220px; }
+
+/* ══ PROGRESS BAR ════════════════════════════════════════ */
+.progress-wrap { margin-top: 8px; }
+.progress-bar {
+  height: 6px; border-radius: 3px; background: var(--surface-2);
+  overflow: hidden;
+}
+.progress-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+
+/* ══ ACTIVITY LIST ════════════════════════════════════════ */
+.activity-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 0; border-bottom: 1px solid var(--border-light);
+}
+.activity-row:last-child { border-bottom: none; }
+.act-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.act-info { flex: 1; min-width: 0; }
+.act-name { font-size: 14px; font-weight: 500; }
+.act-meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.act-stats { text-align: right; flex-shrink: 0; }
+.act-dist { font-size: 14px; font-weight: 600; }
+.act-pace { font-size: 12px; color: var(--text-hint); }
+
+/* ══ STRENGTH TRACKER ════════════════════════════════════ */
+.strength-days { display: flex; gap: 8px; }
+.str-day {
+  flex: 1; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 6px; text-align: center;
+}
+.str-day.done { background: #e8f0fe; border-color: #1a73e840; }
+.str-day .day-label { font-size: 11px; color: var(--text-hint); font-weight: 500; }
+.str-day .day-icon { font-size: 18px; margin-top: 4px; }
+
+/* ══ HABITS FORM ════════════════════════════════════════ */
+.form-field { margin-bottom: 24px; }
+.field-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 10px; }
+.water-group { display: flex; gap: 10px; }
+.water-btn {
+  flex: 1; padding: 12px 8px; border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border); background: white;
+  font-family: var(--font); font-size: 14px; color: var(--text-secondary);
+  cursor: pointer; transition: all 0.15s; text-align: center;
+}
+.water-btn:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-light); }
+.water-btn.selected { border-color: var(--blue); color: var(--blue); background: var(--blue-light); font-weight: 600; }
+
+/* Toggle */
+.toggle-row { display: flex; align-items: center; gap: 14px; }
+.toggle {
+  width: 44px; height: 24px; background: var(--border); border-radius: 12px;
+  cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0;
+}
+.toggle.on { background: var(--blue); }
+.toggle::after {
+  content: ''; position: absolute; width: 18px; height: 18px;
+  border-radius: 50%; background: white; top: 3px; left: 3px;
+  transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.toggle.on::after { transform: translateX(20px); }
+.toggle-label { font-size: 14px; color: var(--text-primary); }
+
+/* Slider */
+.slider-display { font-size: 28px; font-weight: 600; color: var(--blue); text-align: center; margin-bottom: 8px; }
+.slider-wrap { position: relative; height: 6px; background: var(--surface-2); border-radius: 3px; margin-bottom: 6px; }
+.slider-fill { position: absolute; height: 100%; border-radius: 3px; background: var(--blue); pointer-events: none; }
+input[type=range] {
+  position: absolute; inset: -8px 0; opacity: 0; cursor: pointer;
+  width: 100%; -webkit-appearance: none; margin: 0;
+}
+.slider-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-hint); }
+
+.submit-btn {
+  width: 100%; padding: 14px; background: var(--blue); color: white;
+  border: none; border-radius: var(--radius-sm);
+  font-family: var(--font); font-size: 15px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s; margin-top: 8px;
+  box-shadow: 0 2px 6px rgba(26,115,232,0.3);
+}
+.submit-btn:hover { background: #1557b0; box-shadow: 0 4px 12px rgba(26,115,232,0.4); }
+
+/* Heatmap */
+.heatmap-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; margin-top: 10px; }
+.hm-cell {
+  aspect-ratio: 1; border-radius: 4px; background: var(--surface-2);
+  border: 1px solid var(--border-light); cursor: pointer;
+  transition: transform 0.12s;
+}
+.hm-cell:hover { transform: scale(1.2); }
+.hm-cell.h { background: #1a73e8; border-color: #1557b0; }
+.hm-cell.m { background: #aecbfa; border-color: #1a73e840; }
+.hm-cell.l { background: #d2e3fc; border-color: #1a73e820; }
+
+/* ══ CHIP / BADGE ════════════════════════════════════════ */
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 12px;
+  font-size: 12px; font-weight: 500; background: var(--surface-2); color: var(--text-secondary);
+}
+.chip.blue { background: var(--blue-light); color: var(--blue); }
+.chip.green { background: var(--green-light); color: var(--green); }
+.chip.orange { background: var(--orange-light); color: var(--orange); }
+.chip.yellow { background: var(--yellow-light); color: var(--yellow); }
+
+/* ══ DIVIDER ════════════════════════════════════════════ */
+.divider { height: 1px; background: var(--border-light); margin: 16px 0; }
+
+/* ══ LOADING ════════════════════════════════════════════ */
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, #eaecee 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite; border-radius: 6px;
+}
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* ══ AI CHAT ════════════════════════════════════════════ */
+#chat-panel {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
+  background: var(--surface);
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.1);
+  border-top: 1px solid var(--border);
+}
+.chat-bar {
+  max-width: 1280px; margin: 0 auto;
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 24px; height: 56px; cursor: pointer;
+  user-select: none;
+}
+.chat-bar-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+}
+.ai-badge {
+  background: var(--blue); color: white;
+  font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px;
+  letter-spacing: 0.4px;
+}
+.chat-hint { font-size: 12px; color: var(--text-hint); margin-left: 8px; }
+.chat-expand { margin-left: auto; color: var(--text-hint); transition: transform 0.2s; font-size: 18px; }
+.chat-expand.open { transform: rotate(180deg); }
+
+.chat-body { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+.chat-body.open { max-height: 420px; }
+
+.chat-msgs {
+  max-width: 1280px; margin: 0 auto;
+  height: 300px; overflow-y: auto;
+  padding: 16px 24px;
+  scroll-behavior: smooth;
+}
+.chat-msgs::-webkit-scrollbar { width: 4px; }
+.chat-msgs::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.msg { max-width: 680px; margin-bottom: 14px; animation: fadeUp 0.2s ease; }
+.msg.user { margin-left: auto; }
+.msg-bubble { padding: 10px 16px; border-radius: 18px; font-size: 14px; line-height: 1.5; }
+.msg.user .msg-bubble { background: var(--blue); color: white; border-radius: 18px 18px 4px 18px; }
+.msg.ai .msg-bubble { background: var(--surface-2); color: var(--text-primary); border-radius: 4px 18px 18px 18px; }
+.msg-time { font-size: 11px; color: var(--text-hint); margin-top: 4px; }
+.msg.user .msg-time { text-align: right; }
+
+.typing-indicator { display: flex; gap: 5px; align-items: center; padding: 10px 16px; }
+.typing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-hint); animation: bounce 1.2s infinite; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce { 0%,80%,100%{transform:scale(0.7);opacity:0.4} 40%{transform:scale(1);opacity:1} }
+
+.chat-input-row {
+  max-width: 1280px; margin: 0 auto;
+  display: flex; gap: 10px; padding: 12px 24px;
+  border-top: 1px solid var(--border-light);
+}
+.chat-input {
+  flex: 1; padding: 10px 16px;
+  border: 1.5px solid var(--border); border-radius: 24px;
+  font-family: var(--font); font-size: 14px; color: var(--text-primary);
+  background: white; outline: none; transition: border-color 0.15s;
+}
+.chat-input:focus { border-color: var(--blue); }
+.chat-input::placeholder { color: var(--text-hint); }
+.chat-send {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--blue); border: none; color: white;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0; transition: all 0.15s;
+  font-size: 16px;
+}
+.chat-send:hover { background: #1557b0; box-shadow: 0 2px 8px rgba(26,115,232,0.4); }
+.chat-send:disabled { background: var(--border); cursor: not-allowed; }
+
+/* ══ TOAST ════════════════════════════════════════════ */
+.toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(10px);
+  background: #323232; color: white; font-size: 14px;
+  padding: 12px 24px; border-radius: 8px;
+  opacity: 0; transition: all 0.25s; z-index: 500; pointer-events: none;
+  font-family: var(--font);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ══ RESPONSIVE ════════════════════════════════════════ */
+@media (max-width: 960px) {
+  .cols-4 { grid-template-columns: repeat(2, 1fr); }
+  .cols-3 { grid-template-columns: repeat(2, 1fr); }
+  .cols-2-1, .cols-1-2 { grid-template-columns: 1fr; }
+  main { padding: 16px 16px 180px; }
+  .header-inner { padding: 0 16px; }
+  .chat-msgs { padding: 12px 16px; }
+  .chat-input-row { padding: 10px 16px; }
+}
+@media (max-width: 600px) {
+  .cols-2 { grid-template-columns: 1fr; }
+  .header-date { display: none; }
+  nav { gap: 0; }
+  .nav-btn { padding: 8px 12px; font-size: 13px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER ══════════════════════════════════════════════ -->
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">🏃</div>
+      Tobin Health
+    </div>
+    <nav>
+      <button class="nav-btn active" onclick="nav('dashboard', this)"><span class="icon">📊</span> Dashboard</button>
+      <button class="nav-btn" onclick="nav('training', this)"><span class="icon">🏋️</span> Entrenos</button>
+      <button class="nav-btn" onclick="nav('habits', this)"><span class="icon">✅</span> Hábitos</button>
+    </nav>
+    <div class="header-date" id="header-date"></div>
+  </div>
+</header>
+
+<main>
+
+<!-- Supabase pre-configurado -->
+<div class="setup-banner hidden" id="setup-banner"><input id="sb-url"><input id="sb-key"></div>
+
+<!-- ══════════════════════════════════════════════════════
+     DASHBOARD
+════════════════════════════════════════════════════════ -->
+<section id="s-dashboard" class="section active">
+  <div class="section-header">
+    <h1>Resumen de salud</h1>
+    <p id="dash-subtitle">Cargando datos…</p>
+  </div>
+
+  <!-- KPIs de hoy -->
+  <div class="row cols-4">
+    <div class="card metric-card">
+      <div class="metric-label"><div class="dot" style="background:#1e8e3e"></div>Recovery Whoop</div>
+      <div class="metric-value" id="kpi-recovery">—</div>
+      <div class="metric-unit">recovery score</div>
+      <div id="kpi-recovery-chip"></div>
+    </div>
+    <div class="card metric-card">
+      <div class="metric-label"><div class="dot" style="background:#1a73e8"></div>Strain Whoop</div>
+      <div class="metric-value" id="kpi-strain">—</div>
+      <div class="metric-unit">carga del día</div>
+      <div class="metric-delta delta-neu" id="kpi-strain-tag">cargando…</div>
+    </div>
+    <div class="card metric-card">
+      <div class="metric-label"><div class="dot" style="background:#7c4dff"></div>VO2Max</div>
+      <div class="metric-value" id="kpi-vo2">—</div>
+      <div class="metric-unit">ml/kg/min</div>
+      <div class="metric-delta delta-pos" id="kpi-vo2-tag">↑ mejorando</div>
+    </div>
+    <div class="card metric-card">
+      <div class="metric-label"><div class="dot" style="background:#009688"></div>HRV</div>
+      <div class="metric-value" id="kpi-hrv">—</div>
+      <div class="metric-unit">ms esta mañana</div>
+      <div class="metric-delta" id="kpi-hrv-tag">cargando…</div>
+    </div>
+  </div>
+
+  <!-- Recovery + Strain semanal -->
+  <div class="row cols-2">
+    <div class="card chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Recovery & Strain — evolución semanal</div>
+          <div class="chart-subtitle">Promedios por semana · Whoop</div>
+        </div>
+        <div class="period-tabs">
+          <button class="period-tab active" onclick="setP('rec','4w',this)">4S</button>
+          <button class="period-tab" onclick="setP('rec','8w',this)">8S</button>
+          <button class="period-tab" onclick="setP('rec','3m',this)">3M</button>
+        </div>
+      </div>
+      <canvas id="c-rec"></canvas>
+    </div>
+
+    <div class="card chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">HRV — evolución semanal</div>
+          <div class="chart-subtitle">Promedio semanal en ms · Whoop</div>
+        </div>
+        <div class="period-tabs">
+          <button class="period-tab active" onclick="setP('hrv','4w',this)">4S</button>
+          <button class="period-tab" onclick="setP('hrv','8w',this)">8S</button>
+        </div>
+      </div>
+      <canvas id="c-hrv"></canvas>
+    </div>
+  </div>
+
+  <!-- VO2Max mes + KMs acumulados -->
+  <div class="row cols-2">
+    <div class="card chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">VO2Max — evolución mensual</div>
+          <div class="chart-subtitle">ml/kg/min · Garmin</div>
+        </div>
+        <div class="period-tabs">
+          <button class="period-tab active" onclick="setP('vo2','2m',this)">2M</button>
+          <button class="period-tab" onclick="setP('vo2','6m',this)">6M</button>
+        </div>
+      </div>
+      <canvas id="c-vo2"></canvas>
+    </div>
+
+    <div class="card chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">KMs acumulados por semana</div>
+          <div class="chart-subtitle">Volumen semanal de running · Garmin</div>
+        </div>
+        <div class="period-tabs">
+          <button class="period-tab active" onclick="setP('km','8w',this)">8S</button>
+          <button class="period-tab" onclick="setP('km','16w',this)">16S</button>
+          <button class="period-tab" onclick="setP('km','6m',this)">6M</button>
+        </div>
+      </div>
+      <canvas id="c-km"></canvas>
+    </div>
+  </div>
+
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     ENTRENOS
+════════════════════════════════════════════════════════ -->
+<section id="s-training" class="section">
+  <div class="section-header">
+    <h1>Entrenamientos</h1>
+    <p>Actividades recientes y seguimiento de fortalecimiento</p>
+  </div>
+
+  <div class="row cols-4">
+    <div class="card metric-card">
+      <div class="metric-label"><div class="dot" style="background:#1a73e8"></div>KMs esta semana</div>
+      <div class="metric-value" id="t-km-week">—</div>
+      <div class="metric-unit">km corridos</div>
+      <div class="metric-delta delta-pos" id="t-km-delta">cargando…</div>
+    </div>
+    <div class="card metric-card">
+      <div class="metric-label"><div class="dot" style="background:#e65100"></div>Fortalecimiento</div>
+      <div class="metric-value" id="t-strength">—</div>
+      <div class="metric-unit">sesiones esta semana</div>
+      <div class="metric-delta" id="t-strength-tag">meta: 3 sesiones</div>
+    </div>
+    <div class="card metric-card">
+      <div class="metric-label"><div class="dot" style="background:#7c4dff"></div>Pace promedio</div>
+      <div class="metric-value" id="t-pace">—</div>
+      <div class="metric-unit">min/km promedio</div>
+      <div class="metric-delta delta-pos" id="t-pace-tag">↑ mejorando</div>
+    </div>
+    <div class="card metric-card">
+      <div class="metric-label"><div class="dot" style="background:#009688"></div>Carga semanal</div>
+      <div class="metric-value" id="t-strain-total">—</div>
+      <div class="metric-unit">strain acumulado</div>
+      <div class="metric-delta delta-neu" id="t-strain-tag">moderado</div>
+    </div>
+  </div>
+
+  <!-- Fortalecimiento tracker -->
+  <div class="row">
+    <div class="card">
+      <div class="chart-header" style="margin-bottom:14px">
+        <div class="chart-title">Fortalecimiento esta semana · Whoop</div>
+        <div id="strength-count-chip"></div>
+      </div>
+      <div class="strength-days" id="strength-days"></div>
+      <div style="margin-top:12px; font-size:13px; color:var(--text-secondary)" id="strength-note"></div>
+    </div>
+  </div>
+
+  <div class="row cols-2-1">
+    <!-- Actividades recientes -->
+    <div class="card">
+      <div class="chart-header" style="margin-bottom:0">
+        <div class="chart-title">Actividades recientes</div>
+        <span class="chip blue" id="act-count-chip">—</span>
+      </div>
+      <div class="divider"></div>
+      <div id="activities-list"></div>
+    </div>
+
+    <!-- Pace evolution -->
+    <div class="card chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Pace promedio semanal</div>
+          <div class="chart-subtitle">min/km · carreras largas</div>
+        </div>
+      </div>
+      <canvas id="c-pace"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     HÁBITOS
+════════════════════════════════════════════════════════ -->
+<section id="s-habits" class="section">
+  <div class="section-header">
+    <h1>Check-in diario</h1>
+    <p>Registro de hábitos para correlacionar con tu rendimiento</p>
+  </div>
+
+  <div class="row cols-1-2">
+    <!-- Form -->
+    <div class="card" style="padding:24px">
+      <h3 style="font-size:16px;font-weight:600;margin-bottom:4px">Hoy · <span id="habit-today-label"></span></h3>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:24px">¿Cómo estuvo tu día?</p>
+
+      <div class="form-field">
+        <div class="field-label">💧 Hidratación</div>
+        <div class="water-group">
+          <button class="water-btn" onclick="selWater('poco',this)">Poco</button>
+          <button class="water-btn" onclick="selWater('medio',this)">Medio</button>
+          <button class="water-btn" onclick="selWater('alto',this)">Alto</button>
+        </div>
+      </div>
+
+      <div class="form-field">
+        <div class="field-label">🧘 Meditación</div>
+        <div class="toggle-row">
+          <div class="toggle" id="med-toggle" onclick="togMed()"></div>
+          <span class="toggle-label" id="med-label">No medité hoy</span>
+        </div>
+      </div>
+
+      <div class="form-field">
+        <div class="field-label">⚡ Energía percibida</div>
+        <div class="slider-display" id="e-val">50</div>
+        <div class="slider-wrap">
+          <div class="slider-fill" id="e-fill" style="width:50%"></div>
+          <input type="range" min="0" max="100" value="50" oninput="updSlider('e',this.value)">
+        </div>
+        <div class="slider-labels"><span>Sin energía</span><span>100</span></div>
+      </div>
+
+      <div class="form-field">
+        <div class="field-label">😊 Ánimo percibido</div>
+        <div class="slider-display" id="a-val">50</div>
+        <div class="slider-wrap">
+          <div class="slider-fill" id="a-fill" style="width:50%"></div>
+          <input type="range" min="0" max="100" value="50" oninput="updSlider('a',this.value)">
+        </div>
+        <div class="slider-labels"><span>Muy bajo</span><span>100</span></div>
+      </div>
+
+      <button class="submit-btn" onclick="saveHabits()">Guardar check-in</button>
+    </div>
+
+    <!-- History panels -->
+    <div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="chart-header" style="margin-bottom:12px">
+          <div class="chart-title">Energía & Ánimo — últimas 4 semanas</div>
+          <span class="chip green" id="streak-chip">🔥 racha —</span>
+        </div>
+        <canvas id="c-habits"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="chart-header" style="margin-bottom:10px">
+          <div class="chart-title">Check-ins completados — últimos 60 días</div>
+        </div>
+        <div class="heatmap-grid" id="hm-grid"></div>
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text-hint)">
+          <span>Menos</span>
+          <div style="width:14px;height:14px;border-radius:3px;background:#d2e3fc;border:1px solid #1a73e820"></div>
+          <div style="width:14px;height:14px;border-radius:3px;background:#aecbfa;border:1px solid #1a73e840"></div>
+          <div style="width:14px;height:14px;border-radius:3px;background:#1a73e8;border:1px solid #1557b0"></div>
+          <span>Más</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ══ AI CHAT PANEL ══════════════════════════════════════ -->
+<div id="chat-panel">
+  <div class="chat-bar" onclick="toggleChat()">
+    <div class="chat-bar-label">
+      <span>🤖</span> Pregúntale a tu coach
+      <span class="ai-badge">IA</span>
+    </div>
+    <span class="chat-hint">Analiza tus datos de Garmin, Whoop y hábitos</span>
+    <span class="chat-expand" id="chat-expand">▲</span>
+  </div>
+  <div class="chat-body" id="chat-body">
+    <div class="chat-msgs" id="chat-msgs"></div>
+    <div class="chat-input-row">
+      <input class="chat-input" id="chat-in" placeholder="¿Debería correr mañana dado mi recovery? ¿Cómo ha evolucionado mi VO2Max?" onkeydown="if(event.key==='Enter')sendMsg()">
+      <button class="chat-send" id="chat-btn" onclick="sendMsg()">↑</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ══ SCRIPT ══════════════════════════════════════════════ -->
+<script>
+// ════════════════════════════════════════════════════════
+//  CONFIG & SUPABASE
+// ════════════════════════════════════════════════════════
+const LS_URL = 'tobin_sb_url';
+const LS_KEY = 'tobin_sb_key';
+let supabase = null;
+
+// ── Credenciales de tu proyecto tobin-todo ──────────────────
+const DEFAULT_SB_URL = 'https://hnlhmjykovmzgnkepcfa.supabase.co';
+const DEFAULT_SB_KEY = 'sb_publishable_wF7GQv5a369fO3UBfpYqlg_ZmqJf6Vx';
+// ────────────────────────────────────────────────────────────
+
+function loadConfig() {
+  // Credenciales hardcodeadas — proyecto tobin-todo
+  const url = DEFAULT_SB_URL;
+  const key = DEFAULT_SB_KEY;
+  document.getElementById('setup-banner').classList.add('hidden');
+  supabase = window.supabase.createClient(url, key);
+  return true;
+}
+
+function saveConfig() {
+  const url = document.getElementById('sb-url').value.trim();
+  const key = document.getElementById('sb-key').value.trim();
+  if (!url || !key) { toast('Ingresa URL y key de Supabase'); return; }
+  localStorage.setItem(LS_URL, url);
+  localStorage.setItem(LS_KEY, key);
+  supabase = window.supabase.createClient(url, key);
+  document.getElementById('setup-banner').classList.add('hidden');
+  toast('✓ Conectado a Supabase');
+  loadDashboard();
+}
+
+// ════════════════════════════════════════════════════════
+//  DEMO DATA (used if Supabase not configured)
+// ════════════════════════════════════════════════════════
+function genDemoMetrics(days) {
+  const rows = [];
+  for (let i = days; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    rows.push({
+      date: d.toISOString().split('T')[0],
+      recovery_score: 50 + Math.round(Math.random() * 45),
+      strain_score: parseFloat((7 + Math.random() * 11).toFixed(1)),
+      hrv_ms: 52 + Math.round(Math.random() * 32),
+      rhr_bpm: 48 + Math.round(Math.random() * 12),
+      vo2max: parseFloat((49.5 + (days - i) * 0.028 + Math.random() * 0.3).toFixed(1)),
+      km_run: Math.random() > 0.4 ? parseFloat((6 + Math.random() * 14).toFixed(2)) : null,
+      activity_type: Math.random() > 0.6 ? 'run' : Math.random() > 0.4 ? 'strength' : null,
+      avg_pace_sec: 320 + Math.round(Math.random() * 80),
+      avg_hr: 140 + Math.round(Math.random() * 25),
+      sleep_hours: parseFloat((6.5 + Math.random() * 2).toFixed(1))
+    });
+  }
+  return rows;
+}
+
+function genDemoHabits(days) {
+  const opts = ['poco','medio','alto'];
+  return Array.from({length: days}, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (days - i));
+    return {
+      date: d.toISOString().split('T')[0],
+      agua: opts[Math.floor(Math.random()*3)],
+      meditado: Math.random() > 0.45,
+      energia: 45 + Math.round(Math.random() * 45),
+      animo: 50 + Math.round(Math.random() * 40)
+    };
+  });
+}
+
+// ════════════════════════════════════════════════════════
+//  DATA FETCHING
+// ════════════════════════════════════════════════════════
+let METRICS = [];   // daily_metrics sorted asc
+let HABITS  = [];   // daily_habits sorted asc
+let CHAT    = [];   // chat_messages
+
+async function fetchAll() {
+  if (!supabase) {
+    METRICS = genDemoMetrics(90);
+    HABITS  = genDemoHabits(60);
+    return;
+  }
+  const [m, h] = await Promise.all([
+    supabase.from('daily_metrics').select('*').order('date', {ascending: true}).limit(180),
+    supabase.from('daily_habits').select('*').order('date', {ascending: true}).limit(90)
+  ]);
+  METRICS = m.data || genDemoMetrics(90);
+  HABITS  = h.data || genDemoHabits(60);
+}
+
+async function loadChatHistory() {
+  if (!supabase) {
+    CHAT = JSON.parse(localStorage.getItem('tobin_chat') || '[]');
+    return;
+  }
+  const {data} = await supabase.from('chat_messages').select('*').order('created_at',{ascending:true}).limit(100);
+  CHAT = (data || []).map(r => ({role: r.role, content: r.content, time: new Date(r.created_at).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'})}));
+}
+
+async function saveChatMsg(role, content) {
+  const time = new Date().toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
+  CHAT.push({role, content, time});
+  if (supabase) {
+    await supabase.from('chat_messages').insert({role, content});
+  } else {
+    localStorage.setItem('tobin_chat', JSON.stringify(CHAT.slice(-80)));
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  AGGREGATION HELPERS
+// ════════════════════════════════════════════════════════
+function weekStart(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  const day = d.getDay(); // 0=Sun
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().split('T')[0];
+}
+
+function groupByWeek(rows, field) {
+  const map = {};
+  rows.forEach(r => {
+    if (r[field] == null) return;
+    const wk = weekStart(r.date);
+    if (!map[wk]) map[wk] = {sum: 0, count: 0};
+    map[wk].sum += parseFloat(r[field]);
+    map[wk].count++;
+  });
+  return Object.entries(map)
+    .sort(([a],[b]) => a.localeCompare(b))
+    .map(([week, {sum, count}]) => ({week, value: sum/count}));
+}
+
+function sumByWeek(rows, field) {
+  const map = {};
+  rows.forEach(r => {
+    if (r[field] == null) return;
+    const wk = weekStart(r.date);
+    if (!map[wk]) map[wk] = 0;
+    map[wk] += parseFloat(r[field]);
+  });
+  return Object.entries(map)
+    .sort(([a],[b]) => a.localeCompare(b))
+    .map(([week, value]) => ({week, value}));
+}
+
+function last(arr, n) { return arr.slice(-n); }
+
+function weekLabel(str) {
+  const d = new Date(str + 'T12:00:00');
+  return d.toLocaleDateString('es', {day:'numeric', month:'short'});
+}
+
+function paceStr(sec) {
+  if (!sec) return '—';
+  const m = Math.floor(sec/60), s = String(sec%60).padStart(2,'0');
+  return m+':'+s;
+}
+
+// ════════════════════════════════════════════════════════
+//  CHART DEFAULTS
+// ════════════════════════════════════════════════════════
+Chart.defaults.font.family = "'Google Sans', sans-serif";
+Chart.defaults.font.size = 11;
+
+const GRID_COLOR = 'rgba(0,0,0,0.05)';
+const TICK_COLOR = '#9aa0a6';
+
+const BASE_OPTS = {
+  responsive: true, maintainAspectRatio: true,
+  animation: { duration: 500, easing: 'easeInOutQuart' },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: 'white', borderColor: '#e0e0e0', borderWidth: 1,
+      titleColor: '#202124', bodyColor: '#5f6368',
+      titleFont: { family: "'Google Sans'", size: 12, weight: '600' },
+      bodyFont: { family: "'Google Sans Text'", size: 12 },
+      padding: 12, cornerRadius: 8, caretSize: 5,
+      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+    }
+  },
+  scales: {
+    x: { grid: { color: GRID_COLOR }, ticks: { color: TICK_COLOR, maxRotation: 0 } },
+    y: { grid: { color: GRID_COLOR }, ticks: { color: TICK_COLOR } }
+  }
+};
+
+function deepMerge(base, overrides) {
+  const out = Object.assign({}, base);
+  for (const k in overrides) {
+    if (overrides[k] && typeof overrides[k] === 'object' && !Array.isArray(overrides[k])) {
+      out[k] = deepMerge(base[k] || {}, overrides[k]);
+    } else {
+      out[k] = overrides[k];
+    }
+  }
+  return out;
+}
+
+function lineDs(label, data, color, fill=false) {
+  return {
+    label, data,
+    borderColor: color, backgroundColor: fill ? color+'18' : 'transparent',
+    fill, tension: 0.4, borderWidth: 2.5,
+    pointBackgroundColor: color, pointRadius: 3, pointHoverRadius: 5
+  };
+}
+
+function barDs(label, data, color) {
+  return {
+    label, data, backgroundColor: color+'cc',
+    borderColor: color, borderWidth: 0,
+    borderRadius: 5, borderSkipped: false
+  };
+}
+
+// Store chart instances
+const CHARTS = {};
+
+function makeChart(id, type, data, opts) {
+  if (CHARTS[id]) CHARTS[id].destroy();
+  const ctx = document.getElementById(id).getContext('2d');
+  CHARTS[id] = new Chart(ctx, { type, data, options: deepMerge(BASE_OPTS, opts || {}) });
+  return CHARTS[id];
+}
+
+// ════════════════════════════════════════════════════════
+//  CHART DATA BUILDERS (period-aware)
+// ════════════════════════════════════════════════════════
+const CHART_DATA = {};  // cache computed series
+
+function buildAllSeries() {
+  // Recovery weekly avg
+  const recWeekly = groupByWeek(METRICS, 'recovery_score');
+  const strainWeekly = groupByWeek(METRICS, 'strain_score');
+  const hrvWeekly = groupByWeek(METRICS, 'hrv_ms');
+  const kmWeekly = sumByWeek(METRICS.filter(r=>r.activity_type==='run'), 'km_run');
+  const vo2Points = METRICS.filter(r=>r.vo2max).map(r=>({date:r.date, value:r.vo2max}));
+
+  CHART_DATA.rec = { recWeekly, strainWeekly };
+  CHART_DATA.hrv = { hrvWeekly };
+  CHART_DATA.km = { kmWeekly };
+  CHART_DATA.vo2 = { vo2Points };
+  CHART_DATA.pace = groupByWeek(METRICS.filter(r=>r.avg_pace_sec&&r.activity_type==='run'), 'avg_pace_sec');
+  CHART_DATA.habits = HABITS;
+}
+
+// period string to # of weeks back
+function periodsToWeeks(p) {
+  return {
+    '4w':4, '8w':8, '16w':16, '3m':13, '6m':26,
+    '2m':9, '2w':2
+  }[p] || 8;
+}
+
+function sliceWeeks(arr, weeks) { return last(arr, weeks); }
+function sliceDays(arr, days) { return last(arr, days); }
+
+// ════════════════════════════════════════════════════════
+//  DRAW CHARTS
+// ════════════════════════════════════════════════════════
+function drawRecChart(period='4w') {
+  const n = periodsToWeeks(period);
+  const rec = sliceWeeks(CHART_DATA.rec.recWeekly, n);
+  const str = sliceWeeks(CHART_DATA.rec.strainWeekly, n);
+  const labels = rec.map(r => weekLabel(r.week));
+  makeChart('c-rec', 'line', {
+    labels,
+    datasets: [
+      lineDs('Recovery %', rec.map(r=>Math.round(r.value)), '#1e8e3e', true),
+      lineDs('Strain', str.map(r=>parseFloat(r.value.toFixed(1))), '#1a73e8')
+    ]
+  }, {
+    plugins: {
+      legend: { display: true, labels: { color:'#5f6368', font:{size:11}, boxWidth:10, padding:16 } },
+      tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.raw } }
+    },
+    scales: {
+      x: { grid:{color:GRID_COLOR}, ticks:{color:TICK_COLOR} },
+      y: { grid:{color:GRID_COLOR}, ticks:{color:TICK_COLOR, callback: v => v}, max:100, min:0 }
+    }
+  });
+}
+
+function drawHrvChart(period='4w') {
+  const n = periodsToWeeks(period);
+  const hrv = sliceWeeks(CHART_DATA.hrv.hrvWeekly, n);
+  makeChart('c-hrv', 'line', {
+    labels: hrv.map(r => weekLabel(r.week)),
+    datasets: [lineDs('HRV ms', hrv.map(r=>Math.round(r.value)), '#009688', true)]
+  }, {
+    scales: {
+      x: { grid:{color:GRID_COLOR}, ticks:{color:TICK_COLOR} },
+      y: { grid:{color:GRID_COLOR}, ticks:{color:TICK_COLOR, callback: v => v + 'ms'}, min: 0 }
+    }
+  });
+}
+
+function drawVo2Chart(period='2m') {
+  const months = {'2m':60,'6m':180,'12m':365}[period] || 60;
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - months);
+  const pts = CHART_DATA.vo2.vo2Points.filter(p => new Date(p.date) >= cutoff);
+  const step = Math.max(1, Math.floor(pts.length / 30));
+  const sampled = pts.filter((_,i) => i % step === 0 || i === pts.length-1);
+  makeChart('c-vo2', 'line', {
+    labels: sampled.map(p => { const d = new Date(p.date+'T12:00:00'); return d.toLocaleDateString('es',{day:'numeric',month:'short'}); }),
+    datasets: [lineDs('VO2Max', sampled.map(p=>p.value), '#7c4dff', true)]
+  }, {
+    scales: {
+      x: { grid:{color:GRID_COLOR}, ticks:{color:TICK_COLOR, maxTicksLimit:8} },
+      y: { grid:{color:GRID_COLOR}, ticks:{color:TICK_COLOR, callback: v => v + ' ml'}, min: 44 }
+    }
+  });
+}
+
+function drawKmChart(period='8w') {
+  const n = periodsToWeeks(period);
+  const km = sliceWeeks(CHART_DATA.km.kmWeekly, n);
+  makeChart('c-km', 'bar', {
+    labels: km.map(r => weekLabel(r.week)),
+    datasets: [barDs('KMs', km.map(r=>parseFloat(r.value.toFixed(1))), '#1a73e8')]
+  }, {
+    scales: {
+      x: { grid:{color:GRID_COLOR}, ticks:{color:TICK_COLOR} },
+      y: { grid:{color:GRID_COLOR}, ticks:{color:TICK_COLOR, callback: v => v + 'km'}, beginAtZero:true }
+    }
+  });
+}
+
+function drawPaceChart() {
+  const pace = last(CHART_DATA.pace, 8);
+  makeChart('c-pace', 'line', {
+    labels: pace.map(r => weekLabel(r.week)),
+    datasets: [lineDs('Pace', pace.map(r=>parseFloat(r.value.toFixed(0))), '#7c4dff', true)]
+  }, {
+    scales: {
+      x: { grid:{color:GRID_COLOR}, ticks:{color:TICK_COLOR} },
+      y: { grid:{color:GRID_COLOR}, reverse: true,
+        ticks: { color:TICK_COLOR, callback: v => paceStr(v) }
+      }
+    }
+  });
+}
+
+function drawHabitsChart(period='4w') {
+  const days = period==='4w' ? 28 : 14;
+  const data = last(CHART_DATA.habits, days);
+  const labels = data.map(r => { const d = new Date(r.date+'T12:00:00'); return d.toLocaleDateString('es',{weekday:'short',day:'numeric'}); });
+  makeChart('c-habits', 'line', {
+    labels,
+    datasets: [
+      lineDs('Energía', data.map(r=>r.energia), '#f9ab00'),
+      lineDs('Ánimo', data.map(r=>r.animo), '#1e8e3e')
+    ]
+  }, {
+    plugins: {
+      legend: { display: true, labels:{color:'#5f6368',font:{size:11},boxWidth:10,padding:16} }
+    },
+    scales: {
+      x: { grid:{color:GRID_COLOR}, ticks:{color:TICK_COLOR, maxTicksLimit:7} },
+      y: { grid:{color:GRID_COLOR}, ticks:{color:TICK_COLOR}, min:0, max:100 }
+    }
+  });
+}
+
+// Period switcher
+function setP(chartId, period, btn) {
+  btn.closest('.period-tabs').querySelectorAll('.period-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ({ rec: drawRecChart, hrv: drawHrvChart, vo2: drawVo2Chart, km: drawKmChart })[chartId]?.(period);
+}
+
+// ════════════════════════════════════════════════════════
+//  KPI CARDS
+// ════════════════════════════════════════════════════════
+function updateKPIs() {
+  const today = METRICS[METRICS.length - 1];
+  const prev  = METRICS[METRICS.length - 2];
+  if (!today) return;
+
+  document.getElementById('dash-subtitle').textContent =
+    'Actualizado: ' + new Date(today.date+'T12:00:00').toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long'});
+
+  // Recovery
+  const rec = today.recovery_score;
+  document.getElementById('kpi-recovery').textContent = rec ?? '—';
+  const chip = document.getElementById('kpi-recovery-chip');
+  if (rec != null) {
+    const cls = rec >= 67 ? 'pill-green' : rec >= 33 ? 'pill-yellow' : 'pill-red';
+    const lbl = rec >= 67 ? '🟢 Listo para entrenar' : rec >= 33 ? '🟡 Entrenamiento moderado' : '🔴 Descanso recomendado';
+    chip.innerHTML = `<span class="recovery-pill ${cls}">${lbl}</span>`;
+  }
+
+  // Strain
+  const st = today.strain_score;
+  document.getElementById('kpi-strain').textContent = st ?? '—';
+  const stTag = document.getElementById('kpi-strain-tag');
+  if (st != null) {
+    const lbl = st > 16 ? 'alta' : st > 10 ? 'moderada' : 'baja';
+    stTag.textContent = 'Carga ' + lbl;
+    stTag.className = 'metric-delta ' + (st>16?'delta-neg':st>10?'delta-neu':'delta-pos');
+  }
+
+  // VO2Max
+  const vo2 = today.vo2max;
+  document.getElementById('kpi-vo2').textContent = vo2 ? vo2.toFixed(1) : '—';
+  if (vo2 && prev?.vo2max) {
+    const d = (vo2 - prev.vo2max).toFixed(1);
+    const el = document.getElementById('kpi-vo2-tag');
+    el.textContent = (d>0?'↑ +':d<0?'↓ ':'')+d+' esta semana';
+    el.className = 'metric-delta ' + (d>0?'delta-pos':d<0?'delta-neg':'delta-neu');
+  }
+
+  // HRV
+  const hrv = today.hrv_ms;
+  document.getElementById('kpi-hrv').textContent = hrv ?? '—';
+  if (hrv && prev?.hrv_ms) {
+    const d = hrv - prev.hrv_ms;
+    const el = document.getElementById('kpi-hrv-tag');
+    el.textContent = (d>0?'↑ +':d<0?'↓ ':'')+d+'ms vs ayer';
+    el.className = 'metric-delta ' + (d>5?'delta-pos':d<-5?'delta-neg':'delta-neu');
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  TRAINING TAB
+// ════════════════════════════════════════════════════════
+function updateTraining() {
+  // This week's data
+  const mon = weekStart(new Date().toISOString().split('T')[0]);
+  const week = METRICS.filter(r => r.date >= mon);
+
+  const kmWeek = week.reduce((s,r)=> s+(r.km_run||0), 0);
+  const strengthSessions = week.filter(r=>r.activity_type==='strength').length;
+  const paceRows = week.filter(r=>r.avg_pace_sec && r.activity_type==='run');
+  const avgPace = paceRows.length ? Math.round(paceRows.reduce((s,r)=>s+r.avg_pace_sec,0)/paceRows.length) : null;
+  const totalStrain = week.reduce((s,r)=>s+(r.strain_score||0),0);
+
+  document.getElementById('t-km-week').textContent = kmWeek.toFixed(1);
+  document.getElementById('t-strength').textContent = strengthSessions;
+  document.getElementById('t-pace').textContent = paceStr(avgPace);
+  document.getElementById('t-strain-total').textContent = totalStrain.toFixed(1);
+
+  // Strength tag color
+  const stChip = document.getElementById('t-strength-tag');
+  stChip.className = 'metric-delta ' + (strengthSessions>=3?'delta-pos':strengthSessions>=2?'delta-neu':'delta-neg');
+  stChip.textContent = strengthSessions >= 3 ? '✓ Meta alcanzada' : `${strengthSessions}/3 sesiones`;
+
+  // Strength week days
+  const days = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  const daysEl = document.getElementById('strength-days');
+  const COLORS = ['#1a73e8','#e65100','#7c4dff','#009688','#f9ab00'];
+  daysEl.innerHTML = days.map((d,i) => {
+    const dd = new Date(); dd.setDate(dd.getDate() - (dd.getDay()||7) + 1 + i);
+    const dStr = dd.toISOString().split('T')[0];
+    const row = METRICS.find(r=>r.date===dStr);
+    const isStr = row?.activity_type === 'strength';
+    const isRun = row?.activity_type === 'run';
+    const icon = isStr ? '🏋️' : isRun ? '🏃' : row ? '·' : '';
+    const cls = isStr ? 'done' : '';
+    return `<div class="str-day ${cls}">
+      <div class="day-label">${d}</div>
+      <div class="day-icon">${icon || '·'}</div>
+    </div>`;
+  }).join('');
+
+  const strNote = document.getElementById('strength-note');
+  if (strengthSessions < 3) {
+    strNote.textContent = `Te ${3-strengthSessions===1?'falta':'faltan'} ${3-strengthSessions} sesión${3-strengthSessions>1?'es':''} de fortalecimiento para completar la meta semanal.`;
+    strNote.style.color = 'var(--orange)';
+  } else {
+    strNote.textContent = '✓ Meta de fortalecimiento completada esta semana.';
+    strNote.style.color = 'var(--green)';
+  }
+
+  // Act count chip
+  document.getElementById('act-count-chip').textContent = week.filter(r=>r.activity_type).length + ' esta semana';
+
+  // Activities list
+  const actTypes = {
+    run: {icon:'🏃', bg:'#e8f0fe', label:'Carrera'},
+    strength: {icon:'🏋️', bg:'#fbe9e7', label:'Fortalecimiento'},
+    bike: {icon:'🚴', bg:'#ede7f6', label:'Ciclismo'},
+    swim: {icon:'🏊', bg:'#e0f2f1', label:'Natación'},
+    yoga: {icon:'🧘', bg:'#fef7e0', label:'Yoga'}
+  };
+  const recent = METRICS.filter(r=>r.activity_type).slice(-10).reverse();
+  document.getElementById('activities-list').innerHTML = recent.map(r => {
+    const at = actTypes[r.activity_type] || {icon:'⚡', bg:'#f1f3f4', label: r.activity_type};
+    const d = new Date(r.date+'T12:00:00').toLocaleDateString('es',{weekday:'short',day:'numeric',month:'short'});
+    return `
+    <div class="activity-row">
+      <div class="act-icon" style="background:${at.bg}">${at.icon}</div>
+      <div class="act-info">
+        <div class="act-name">${r.activity_name || at.label}</div>
+        <div class="act-meta">${d} · FC ${r.avg_hr||'—'} bpm · ${(r.sleep_hours||'—')}h sueño</div>
+      </div>
+      <div class="act-stats">
+        <div class="act-dist">${r.km_run ? r.km_run.toFixed(1) + ' km' : '—'}</div>
+        <div class="act-pace">${paceStr(r.avg_pace_sec)}</div>
+      </div>
+    </div>`;
+  }).join('') || '<div style="padding:20px;text-align:center;color:var(--text-hint);font-size:14px">Sin actividades recientes</div>';
+
+  // KM delta
+  const prevWeekMon = new Date(mon); prevWeekMon.setDate(prevWeekMon.getDate()-7);
+  const prevWeek = METRICS.filter(r=>r.date>=prevWeekMon.toISOString().split('T')[0]&&r.date<mon);
+  const kmPrev = prevWeek.reduce((s,r)=>s+(r.km_run||0),0);
+  const kmDelta = document.getElementById('t-km-delta');
+  if (kmPrev > 0) {
+    const pct = Math.round((kmWeek-kmPrev)/kmPrev*100);
+    kmDelta.textContent = (pct>=0?'↑ +':'')+pct+'% vs semana anterior';
+    kmDelta.className = 'metric-delta '+(pct>=0?'delta-pos':'delta-neg');
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  HABITS TAB
+// ════════════════════════════════════════════════════════
+function updateHabits() {
+  document.getElementById('habit-today-label').textContent =
+    new Date().toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long'});
+
+  // Streak
+  let streak = 0;
+  const today = new Date().toISOString().split('T')[0];
+  for (let i = 0; i < 60; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const ds = d.toISOString().split('T')[0];
+    if (HABITS.find(h=>h.date===ds)) streak++;
+    else break;
+  }
+  document.getElementById('streak-chip').textContent = '🔥 Racha: ' + streak + ' días';
+
+  // Heatmap
+  const hm = document.getElementById('hm-grid');
+  hm.innerHTML = '';
+  for (let i = 59; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const ds = d.toISOString().split('T')[0];
+    const h = HABITS.find(r=>r.date===ds);
+    let cls = '';
+    if (h) cls = (h.energia||0) > 70 ? 'h' : (h.energia||0) > 40 ? 'm' : 'l';
+    const cell = document.createElement('div');
+    cell.className = 'hm-cell ' + cls;
+    cell.title = ds + (h ? ` · Energía ${h.energia} · Ánimo ${h.animo}` : ' · Sin registro');
+    hm.appendChild(cell);
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  HABITS FORM STATE
+// ════════════════════════════════════════════════════════
+let HF = {agua: null, med: false, e: 50, a: 50};
+
+function selWater(v, el) {
+  document.querySelectorAll('.water-btn').forEach(b=>b.classList.remove('selected'));
+  el.classList.add('selected'); HF.agua = v;
+}
+function togMed() {
+  HF.med = !HF.med;
+  document.getElementById('med-toggle').classList.toggle('on', HF.med);
+  document.getElementById('med-label').textContent = HF.med ? 'Sí, medité hoy ✓' : 'No medité hoy';
+}
+function updSlider(id, v) {
+  HF[id] = parseInt(v);
+  document.getElementById(id+'-val').textContent = v;
+  document.getElementById(id+'-fill').style.width = v + '%';
+  const color = v>70?'var(--green)':v>40?'var(--blue)':'var(--red)';
+  document.getElementById(id+'-val').style.color = color;
+}
+
+async function saveHabits() {
+  if (!HF.agua) { toast('Selecciona tu nivel de hidratación'); return; }
+  const today = new Date().toISOString().split('T')[0];
+  const row = { date: today, agua: HF.agua, meditado: HF.med, energia: HF.e, animo: HF.a };
+
+  if (supabase) {
+    const {error} = await supabase.from('daily_habits').upsert(row, {onConflict: 'date'});
+    if (error) { toast('Error al guardar: ' + error.message); return; }
+  } else {
+    const existing = HABITS.findIndex(h=>h.date===today);
+    if (existing >= 0) HABITS[existing] = row; else HABITS.push(row);
+    HABITS.sort((a,b)=>a.date.localeCompare(b.date));
+    localStorage.setItem('tobin_habits_backup', JSON.stringify(HABITS));
+  }
+
+  toast('✓ Check-in guardado');
+  drawHabitsChart();
+  updateHabits();
+}
+
+// ════════════════════════════════════════════════════════
+//  CHAT
+// ════════════════════════════════════════════════════════
+let chatOpen = false;
+
+function toggleChat() {
+  chatOpen = !chatOpen;
+  document.getElementById('chat-body').classList.toggle('open', chatOpen);
+  document.getElementById('chat-expand').classList.toggle('open', chatOpen);
+  if (chatOpen) renderChat();
+}
+
+function renderChat() {
+  const c = document.getElementById('chat-msgs');
+  if (CHAT.length === 0) {
+    c.innerHTML = `<div class="msg ai">
+      <div class="msg-bubble">Hola 👋 Soy tu coach IA. Tengo acceso a todos tus datos de Garmin y Whoop guardados en Supabase — recovery, strain, HRV, VO2Max, KMs, fortalecimiento y hábitos. ¿Qué quieres analizar?</div>
+      <div class="msg-time">Hoy</div>
+    </div>`;
+    return;
+  }
+  c.innerHTML = CHAT.map(m => `
+    <div class="msg ${m.role==='user'?'user':'ai'}">
+      <div class="msg-bubble">${m.content}</div>
+      <div class="msg-time">${m.time}</div>
+    </div>`).join('');
+  c.scrollTop = c.scrollHeight;
+}
+
+async function sendMsg() {
+  const inp = document.getElementById('chat-in');
+  const msg = inp.value.trim();
+  if (!msg) return;
+  inp.value = '';
+  document.getElementById('chat-btn').disabled = true;
+
+  await saveChatMsg('user', msg);
+  renderChat();
+
+  // Typing indicator
+  const c = document.getElementById('chat-msgs');
+  const typing = document.createElement('div');
+  typing.className = 'msg ai'; typing.id = 'typing';
+  typing.innerHTML = '<div class="msg-bubble"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>';
+  c.appendChild(typing); c.scrollTop = c.scrollHeight;
+
+  // Build rich context from real data
+  const today = METRICS[METRICS.length-1];
+  const lastHabit = HABITS[HABITS.length-1];
+  const recW = groupByWeek(METRICS,'recovery_score');
+  const strW = groupByWeek(METRICS,'strain_score');
+  const kmW = sumByWeek(METRICS.filter(r=>r.activity_type==='run'),'km_run');
+  const hrvW = groupByWeek(METRICS,'hrv_ms');
+
+  const contextSummary = `
+DATOS HOY (${today?.date||'N/A'}):
+- Recovery Whoop: ${today?.recovery_score||'N/A'}%
+- Strain: ${today?.strain_score||'N/A'}
+- HRV: ${today?.hrv_ms||'N/A'} ms
+- FC reposo: ${today?.rhr_bpm||'N/A'} bpm
+- VO2Max Garmin: ${today?.vo2max||'N/A'} ml/kg/min
+- Sueño anoche: ${today?.sleep_hours||'N/A'} horas
+
+SEMANA ACTUAL:
+- KMs corridos: ${kmW.slice(-1)[0]?.value?.toFixed(1)||'N/A'} km
+- Fortalecimiento: ${METRICS.filter(r=>r.date>=weekStart(today?.date||'')).filter(r=>r.activity_type==='strength').length} sesiones (meta: 3)
+- Recovery prom: ${Math.round(recW.slice(-1)[0]?.value||0)}%
+- Strain prom: ${strW.slice(-1)[0]?.value?.toFixed(1)||'N/A'}
+
+TENDENCIAS (últimas 4 semanas):
+- KMs: ${kmW.slice(-4).map(r=>r.value.toFixed(0)+'km').join(' → ')}
+- Recovery semanal: ${recW.slice(-4).map(r=>Math.round(r.value)+'%').join(' → ')}
+- HRV semanal: ${hrvW.slice(-4).map(r=>Math.round(r.value)+'ms').join(' → ')}
+- VO2Max ahora: ${today?.vo2max} (vs hace 4 semanas: ${METRICS.filter(r=>r.vo2max).slice(-30)[0]?.vo2max||'N/A'})
+
+HÁBITOS HOY:
+- Agua: ${lastHabit?.agua||'sin registro'}
+- Meditó: ${lastHabit?.meditado?'sí':'no'}
+- Energía percibida: ${lastHabit?.energia||'—'}/100
+- Ánimo: ${lastHabit?.animo||'—'}/100
+
+HISTORIAL CHAT: ${CHAT.slice(-6,-1).map(m=>m.role+': '+m.content.substring(0,80)).join(' | ')}`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: `Eres el coach de salud y entrenamiento personal de Cristóbal Piñera, triatleta amateur.
+Tienes acceso a todos sus datos guardados en Supabase:
+
+${contextSummary}
+
+REGLAS:
+- Responde en español, directo y útil. Máx 200 palabras.
+- Usa los datos reales provistos arriba. Menciona métricas específicas.
+- Semáforo recovery: <33% 🔴 descanso | 33-66% 🟡 moderado | >66% 🟢 entrenar fuerte
+- Si te preguntan sobre tendencias, usa los datos de semanas anteriores.
+- Sé el coach, no un asistente genérico.`,
+        messages: [{ role: 'user', content: msg }]
+      })
+    });
+    const data = await res.json();
+    const reply = data.content?.[0]?.text || 'No pude obtener respuesta del servidor.';
+    document.getElementById('typing')?.remove();
+    await saveChatMsg('assistant', reply);
+    renderChat();
+  } catch(e) {
+    document.getElementById('typing')?.remove();
+    await saveChatMsg('assistant', 'Error de conexión. Verifica tu configuración.');
+    renderChat();
+  }
+  document.getElementById('chat-btn').disabled = false;
+}
+
+// ════════════════════════════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════════════════════════════
+function nav(id, btn) {
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('s-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ════════════════════════════════════════════════════════
+//  TOAST
+// ════════════════════════════════════════════════════════
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 2800);
+}
+
+// ════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════
+async function loadDashboard() {
+  await fetchAll();
+  buildAllSeries();
+  updateKPIs();
+  updateTraining();
+  updateHabits();
+  drawRecChart('4w');
+  drawHrvChart('4w');
+  drawVo2Chart('2m');
+  drawKmChart('8w');
+  drawPaceChart();
+  drawHabitsChart('4w');
+}
+
+document.getElementById('header-date').textContent =
+  new Date().toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+loadConfig();
+loadChatHistory();
+loadDashboard();
+</script>
+</body>
+</html>

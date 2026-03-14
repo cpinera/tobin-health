@@ -665,11 +665,12 @@ input[type=range] {
       <p style="font-size:13px;color:var(--text-secondary);margin-bottom:24px">¿Cómo estuvo tu día?</p>
 
       <div class="form-field">
-        <div class="field-label">💧 Hidratación</div>
+        <div class="field-label">🍺 Alcohol</div>
         <div class="water-group">
-          <button class="water-btn" onclick="selWater('poco',this)">Poco</button>
-          <button class="water-btn" onclick="selWater('medio',this)">Medio</button>
-          <button class="water-btn" onclick="selWater('alto',this)">Alto</button>
+          <button class="water-btn" onclick="selWater('nada',this)">Nada 🙌</button>
+          <button class="water-btn" onclick="selWater('poco',this)">Poco 🍺</button>
+          <button class="water-btn" onclick="selWater('medio',this)">Medio 🍻</button>
+          <button class="water-btn" onclick="selWater('alto',this)">Harto 🥴</button>
         </div>
       </div>
 
@@ -699,6 +700,14 @@ input[type=range] {
           <input type="range" min="0" max="100" value="50" oninput="updSlider('a',this.value)">
         </div>
         <div class="slider-labels"><span>Muy bajo</span><span>100</span></div>
+      </div>
+
+      <div class="form-field">
+        <div class="field-label">🏋️ Fortalecimiento hoy</div>
+        <div class="toggle-row">
+          <div class="toggle" id="fuerza-toggle" onclick="togFuerza()"></div>
+          <span class="toggle-label" id="fuerza-label">No hice fuerza hoy</span>
+        </div>
       </div>
 
       <button class="submit-btn" onclick="saveHabits()">Guardar check-in</button>
@@ -1419,7 +1428,7 @@ function updateHabits() {
 // --------------------------------------------------------
 //  HABITS FORM STATE
 // --------------------------------------------------------
-let HF = {agua: null, med: false, e: 50, a: 50};
+let HF = {agua: null, med: false, e: 50, a: 50, fuerza: false};
 
 function selWater(v, el) {
   document.querySelectorAll('.water-btn').forEach(b=>b.classList.remove('selected'));
@@ -1429,6 +1438,11 @@ function togMed() {
   HF.med = !HF.med;
   document.getElementById('med-toggle').classList.toggle('on', HF.med);
   document.getElementById('med-label').textContent = HF.med ? 'Sí, medité hoy ✓' : 'No medité hoy';
+}
+function togFuerza() {
+  HF.fuerza = !HF.fuerza;
+  document.getElementById('fuerza-toggle').classList.toggle('on', HF.fuerza);
+  document.getElementById('fuerza-label').textContent = HF.fuerza ? 'Sí, hice fuerza hoy 💪' : 'No hice fuerza hoy';
 }
 function updSlider(id, v) {
   HF[id] = parseInt(v);
@@ -1441,7 +1455,7 @@ function updSlider(id, v) {
 async function saveHabits() {
   if (!HF.agua) { toast('Selecciona tu nivel de hidratación'); return; }
   const today = new Date().toISOString().split('T')[0];
-  const row = { date: today, agua: HF.agua, meditado: HF.med, energia: HF.e, animo: HF.a };
+  const row = { date: today, agua: HF.agua, meditado: HF.med, energia: HF.e, animo: HF.a, fuerza: HF.fuerza };
 
   try {
     const headers = {
@@ -1553,9 +1567,14 @@ ${getPlanContext()}
 HISTORIAL CHAT: ${CHAT.slice(-6,-1).map(m=>m.role+': '+m.content.substring(0,80)).join(' | ')}`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    // AI call goes through Supabase as proxy (avoids CORS + API key exposure)
+    const res = await fetch(DEFAULT_SB_URL + '/functions/v1/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'apikey': DEFAULT_SB_KEY,
+        'Authorization': 'Bearer ' + DEFAULT_SB_KEY
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,

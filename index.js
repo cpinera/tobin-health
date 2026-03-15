@@ -290,7 +290,7 @@ app.get("/check-alerts", auth, async (req, res) => {
 
 
 // ── Encuesta de hábitos diaria (Telegram) ───────────────────────────────────
-initHabitsSurvey(bot, process.env.TELEGRAM_CHAT_ID);
+initHabitsSurvey(bot, process.env.TELEGRAM_CHAT_ID, supabase);
 
 // ─── Scheduled jobs ───────────────────────────────────────────────────────────
 
@@ -320,8 +320,6 @@ cron.schedule("0 15 * * *", async () => {
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
-// TEST: enviar encuesta inmediatamente al arrancar (borrar despues)
-setTimeout(() => { try { const {sendHabitsSurvey} = require('./habits-survey'); sendHabitsSurvey(bot, process.env.TELEGRAM_CHAT_ID); console.log('[TEST] encuesta enviada'); } catch(e) { console.error('[TEST]', e.message); } }, 5000);
 app.listen(PORT, () => {
   console.log(`✅ tobin-health running on port ${PORT}`);
 });

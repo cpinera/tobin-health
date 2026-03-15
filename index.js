@@ -8,6 +8,7 @@ const axios = require("axios");
 const cron = require("node-cron");
 const { runAgent, generateDailyBriefing, checkAlerts } = require("./health-agent");
 const whoop = require("./whoop");
+const { initHabitsSurvey } = require('./habits-survey');
 
 const app = express();
 app.use(express.json());
@@ -286,6 +287,10 @@ app.get("/check-alerts", auth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+
+// ── Encuesta de hábitos diaria (Telegram) ───────────────────────────────────
+initHabitsSurvey(bot, process.env.TELEGRAM_CHAT_ID);
 
 // ─── Scheduled jobs ───────────────────────────────────────────────────────────
 

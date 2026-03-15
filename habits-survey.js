@@ -1,267 +1,139 @@
 /**
  * habits-survey.js
- * Cuestionario diario de hábitos via Telegram
+ * Encuesta diaria de habitos via Telegram
  * 
- * INTEGRACIÓN EN index.js (3 pasos):
- * 
- * 1. Al inicio del archivo:
- *    const { initHabitsSurvey } = require('./habits-survey');
- * 
- * 2. Después de crear el bot (donde ya tienes bot = new TelegramBot(...)):
- *    initHabitsSurvey(bot, process.env.TELEGRAM_CHAT_ID);
- * 
- * 3. Ya está. El cron de 10am enviará la encuesta automáticamente.
- *    Si ya tienes un cron a las 10am, elimínalo o comenta esa línea.
+ * Uso en index.js:
+ *   const { initHabitsSurvey } = require('./habits-survey');
+ *   initHabitsSurvey(bot, process.env.TELEGRAM_CHAT_ID, supabase);
  */
 
-const { createClient } = require('@supabase/supabase-js');
 const cron = require('node-cron');
-
-const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-
-// Estado de encuesta en memoria por chat
 const surveyState = {};
 
-// ── Configuración de la encuesta ──────────────────────────────────────────────
-const SURVEY_STEPS = [
-  {
-    id: 'alcohol',
-    label: '🍺 ALCOHOL',
-    question: '¿Tomaste alcohol ayer?',
-    options: [
-      { text: '🙌 Nada', value: 'nada' },
-      { text: '🍺 Poco (1-2)', value: 'poco' },
-      { text: '🍻 Medio (3-4)', value: 'medio' },
-      { text: '🥴 Harto (+4)', value: 'alto' },
-    ]
-  },
-  {
-    id: 'meditado',
-    label: '🧘 MEDITACIÓN',
-    question: '¿Meditaste hoy?',
-    options: [
-      { text: '✅ Sí', value: 'true' },
-      { text: '❌ No', value: 'false' },
-    ]
-  },
-  {
-    id: 'fuerza',
-    label: '🏋️ FUERZA',
-    question: '¿Hiciste entrenamiento de fuerza hoy?',
-    options: [
-      { text: '💪 Sí', value: 'true' },
-      { text: '❌ No', value: 'false' },
-    ]
-  },
-  {
-    id: 'energia',
-    label: '⚡ ENERGÍA',
-    question: '¿Cómo está tu energía hoy?',
-    options: [
-      { text: '😴 20', value: '20' },
-      { text: '😐 40', value: '40' },
-      { text: '🙂 60', value: '60' },
-      { text: '😊 80', value: '80' },
-      { text: '🚀 100', value: '100' },
-    ]
-  },
-  {
-    id: 'animo',
-    label: '😊 ÁNIMO',
-    question: '¿Cómo está tu ánimo?',
-    options: [
-      { text: '😔 20', value: '20' },
-      { text: '😐 40', value: '40' },
-      { text: '🙂 60', value: '60' },
-      { text: '😄 80', value: '80' },
-      { text: '🤩 100', value: '100' },
-    ]
-  }
+const STEPS = [
+  { id:'alcohol', label:'ALCOHOL', q:'Tomaste alcohol ayer?',
+    ops:[{t:'Nada',v:'nada'},{t:'Poco (1-2)',v:'poco'},{t:'Medio (3-4)',v:'medio'},{t:'Harto (+4)',v:'alto'}] },
+  { id:'meditado', label:'MEDITACION', q:'Meditaste hoy?',
+    ops:[{t:'Si',v:'true'},{t:'No',v:'false'}] },
+  { id:'fuerza', label:'FUERZA', q:'Hiciste entrenamiento de fuerza hoy?',
+    ops:[{t:'Si',v:'true'},{t:'No',v:'false'}] },
+  { id:'energia', label:'ENERGIA', q:'Como esta tu energia hoy? (0-100)',
+    ops:[{t:'20',v:'20'},{t:'40',v:'40'},{t:'60',v:'60'},{t:'80',v:'80'},{t:'100',v:'100'}] },
+  { id:'animo', label:'ANIMO', q:'Como esta tu animo? (0-100)',
+    ops:[{t:'20',v:'20'},{t:'40',v:'40'},{t:'60',v:'60'},{t:'80',v:'80'},{t:'100',v:'100'}] }
 ];
 
-// ── Verificar si ya completó hoy ─────────────────────────────────────────────
-async function alreadyCompletedToday() {
-  const today = new Date().toISOString().split('T')[0];
+let sb = null; // set by initHabitsSurvey
+
+async function alreadyDone() {
   try {
-    const { data } = await sb
-      .from('daily_habits')
-      .select('date')
-      .eq('date', today)
-      .single();
+    const today = new Date().toISOString().split('T')[0];
+    const { data } = await sb.from('daily_habits').select('date').eq('date', today).single();
     return !!data;
-  } catch(e) {
-    return false;
-  }
+  } catch(e) { return false; }
 }
 
-// ── Enviar encuesta ───────────────────────────────────────────────────────────
 async function sendHabitsSurvey(bot, chatId) {
-  if (await alreadyCompletedToday()) {
-    console.log('[Habits] Ya completado hoy, saltando encuesta');
+  if (await alreadyDone()) {
+    console.log('[Habits] Ya completado hoy');
     return;
   }
-
-  const today = new Date().toLocaleDateString('es-CL', {
-    weekday: 'long', day: 'numeric', month: 'long'
-  });
-
-  surveyState[chatId] = {
-    step: 0,
-    date: new Date().toISOString().split('T')[0],
-    answers: {}
-  };
-
+  const day = new Date().toLocaleDateString('es-CL', {weekday:'long',day:'numeric',month:'long'});
+  surveyState[chatId] = { step: 0, date: new Date().toISOString().split('T')[0], answers: {} };
   await bot.sendMessage(chatId,
-    `☀️ *Buenos días! Check-in diario — ${today}*\n\nResponde las preguntas de hoy 👇`,
+    '*Buenos dias! Check-in diario ' + day + '*\n\nResponde las preguntas de hoy',
     { parse_mode: 'Markdown' }
   );
-
-  await sendNextQuestion(bot, chatId);
+  await sendNext(bot, chatId);
 }
 
-// ── Enviar siguiente pregunta ─────────────────────────────────────────────────
-async function sendNextQuestion(bot, chatId) {
-  const state = surveyState[chatId];
-  if (!state || state.step >= SURVEY_STEPS.length) return;
-
-  const step = SURVEY_STEPS[state.step];
-  const keyboard = step.options.map(opt => ([{
-    text: opt.text,
-    callback_data: `habit_${step.id}_${opt.value}`
-  }]));
-
-  await bot.sendMessage(chatId,
-    `*${step.label}*\n${step.question}`,
-    {
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: keyboard }
-    }
-  );
+async function sendNext(bot, chatId) {
+  const st = surveyState[chatId];
+  if (!st || st.step >= STEPS.length) return;
+  const s = STEPS[st.step];
+  await bot.sendMessage(chatId, '*' + s.label + '*\n' + s.q, {
+    parse_mode: 'Markdown',
+    reply_markup: { inline_keyboard: s.ops.map(o => ([{ text: o.t, callback_data: 'habit_' + s.id + '_' + o.v }])) }
+  });
 }
 
-// ── Manejar respuesta ─────────────────────────────────────────────────────────
 async function handleHabitsCallback(bot, query) {
-  const data = query.data;
-  if (!data || !data.startsWith('habit_')) return false;
-
+  if (!query.data || !query.data.startsWith('habit_')) return false;
   const chatId = query.message.chat.id;
-  const state = surveyState[chatId];
-  if (!state) return false;
-
+  const st = surveyState[chatId];
+  if (!st) return false;
   await bot.answerCallbackQuery(query.id);
-
-  // Parse: habit_campo_valor
-  const parts = data.split('_');
+  const parts = query.data.split('_');
   const field = parts[1];
-  const value = parts.slice(2).join('_');
-
-  // Validate it's the current step
-  const currentStep = SURVEY_STEPS[state.step];
-  if (currentStep.id !== field) return false;
-
-  // Store answer
+  const val = parts.slice(2).join('_');
+  const step = STEPS[st.step];
+  if (step.id !== field) return false;
   if (field === 'meditado' || field === 'fuerza') {
-    state.answers[field] = value === 'true';
+    st.answers[field] = val === 'true';
   } else if (field === 'energia' || field === 'animo') {
-    state.answers[field] = parseInt(value);
+    st.answers[field] = parseInt(val);
   } else {
-    state.answers[field] = value;
+    st.answers[field] = val;
   }
-
-  // Edit message to show selected
-  const selectedOption = currentStep.options.find(o => o.value === value);
+  const sel = step.ops.find(o => o.v === val);
   try {
-    await bot.editMessageText(
-      `*${currentStep.label}*\n${currentStep.question}\n\n✅ ${selectedOption?.text || value}`,
-      {
-        chat_id: chatId,
-        message_id: query.message.message_id,
-        parse_mode: 'Markdown'
-      }
-    );
+    await bot.editMessageText('*' + step.label + '*\n' + step.q + '\n\n* ' + (sel ? sel.t : val), {
+      chat_id: chatId, message_id: query.message.message_id, parse_mode: 'Markdown'
+    });
   } catch(e) {}
-
-  state.step++;
-
-  if (state.step < SURVEY_STEPS.length) {
-    // Next question
-    await sendNextQuestion(bot, chatId);
+  st.step++;
+  if (st.step < STEPS.length) {
+    await sendNext(bot, chatId);
   } else {
-    // All done — save to Supabase
-    await finishSurvey(bot, chatId, state);
+    await finish(bot, chatId, st);
   }
-
   return true;
 }
 
-// ── Guardar en Supabase y mostrar resumen ─────────────────────────────────────
-async function finishSurvey(bot, chatId, state) {
+async function finish(bot, chatId, st) {
+  const a = st.answers;
   const row = {
-    date: state.date,
-    agua: state.answers.alcohol || 'nada', // campo agua = alcohol en la tabla
-    meditado: state.answers.meditado ?? false,
-    fuerza: state.answers.fuerza ?? false,
-    energia: state.answers.energia || 50,
-    animo: state.answers.animo || 50,
+    date: st.date,
+    agua: a.alcohol || 'nada',
+    meditado: a.meditado ?? false,
+    fuerza: a.fuerza ?? false,
+    energia: a.energia || 50,
+    animo: a.animo || 50
   };
-
   delete surveyState[chatId];
-
   try {
-    const { error } = await sb
-      .from('daily_habits')
-      .upsert(row, { onConflict: 'date' });
-
+    const { error } = await sb.from('daily_habits').upsert(row, { onConflict: 'date' });
     if (error) throw new Error(error.message);
-
-    // Summary
-    const a = state.answers;
-    const e_emoji = a.energia >= 80 ? '🟢' : a.energia >= 50 ? '🟡' : '🔴';
-    const m_emoji = a.animo >= 80 ? '😄' : a.animo >= 50 ? '🙂' : '😔';
-    const alc_emoji = { nada: '🙌', poco: '🍺', medio: '🍻', alto: '🥴' }[a.alcohol] || '🙌';
-
     await bot.sendMessage(chatId,
-      `✅ *Check-in guardado!*\n\n` +
-      `🍺 Alcohol: ${alc_emoji} ${a.alcohol || 'nada'}\n` +
-      `🧘 Meditación: ${a.meditado ? '✅ Sí' : '❌ No'}\n` +
-      `🏋️ Fuerza: ${a.fuerza ? '💪 Sí' : '❌ No'}\n` +
-      `⚡ Energía: ${e_emoji} ${a.energia}/100\n` +
-      `😊 Ánimo: ${m_emoji} ${a.animo}/100\n\n` +
-      `_Visible en tu dashboard → Hábitos_`,
+      '*Check-in guardado!*\n\n' +
+      'Alcohol: ' + (a.alcohol || 'nada') + '\n' +
+      'Meditacion: ' + (a.meditado ? 'Si' : 'No') + '\n' +
+      'Fuerza: ' + (a.fuerza ? 'Si' : 'No') + '\n' +
+      'Energia: ' + (a.energia || 50) + '/100\n' +
+      'Animo: ' + (a.animo || 50) + '/100\n\n' +
+      '_Visible en tu dashboard -> Habitos_',
       { parse_mode: 'Markdown' }
     );
   } catch(e) {
-    await bot.sendMessage(chatId, `❌ Error guardando: ${e.message}`);
+    await bot.sendMessage(chatId, 'Error guardando: ' + e.message);
   }
 }
 
-// ── Inicializar — llamar desde index.js ───────────────────────────────────────
-function initHabitsSurvey(bot, chatId) {
-  // Cron diario 10:00am hora Chile
+function initHabitsSurvey(bot, chatId, supabaseClient) {
+  sb = supabaseClient; // use the shared client from index.js
+
   cron.schedule('0 10 * * *', async () => {
-    console.log('[Habits] Enviando encuesta matutina...');
-    try {
-      await sendHabitsSurvey(bot, chatId);
-    } catch(e) {
-      console.error('[Habits] Error:', e.message);
-    }
+    console.log('[Habits] Enviando encuesta...');
+    try { await sendHabitsSurvey(bot, chatId); }
+    catch(e) { console.error('[Habits]', e.message); }
   }, { timezone: 'America/Santiago' });
 
-  // Handler de respuestas — registrar en el bot
-  bot.on('callback_query', async (query) => {
-    try {
-      await handleHabitsCallback(bot, query);
-    } catch(e) {
-      console.error('[Habits callback] Error:', e.message);
-    }
+  bot.on('callback_query', async (q) => {
+    try { await handleHabitsCallback(bot, q); }
+    catch(e) { console.error('[Habits callback]', e.message); }
   });
 
-  console.log('[Habits] Encuesta diaria activada — 10:00am Chile');
+  console.log('[Habits] Activada - 10:00am Chile');
 }
 
-// También exportar funciones individuales para uso manual
-module.exports = {
-  initHabitsSurvey,
-  sendHabitsSurvey,
-  handleHabitsCallback
-};
+module.exports = { initHabitsSurvey, sendHabitsSurvey, handleHabitsCallback };

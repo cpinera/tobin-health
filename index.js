@@ -324,7 +324,7 @@ cron.schedule("0 15 * * *", async () => {
 // ─── Start ────────────────────────────────────────────────────────────────────
 
 // Encuesta habitos 10am
-initHabitsSurvey(sendTelegram, axios, process.env.TELEGRAM_BOT_TOKEN, process.env.TELEGRAM_CHAT_ID, supabase);
+initHabitsSurvey(sendTelegram, axios, process.env.TELEGRAM_BOT_TOKEN, process.env.TELEGRAM_CHAT_ID);
 
 app.listen(PORT, () => {
   console.log(`✅ tobin-health running on port ${PORT}`);

@@ -8,7 +8,7 @@ const axios = require("axios");
 const cron = require("node-cron");
 const { runAgent, generateDailyBriefing, checkAlerts } = require("./health-agent");
 const whoop = require("./whoop");
-const { initHabitsSurvey } = require('./habits-survey');
+const { initHabitsSurvey, sendHabitsSurvey, handleHabitsCallback } = require('./habits-survey');
 
 const app = express();
 app.use(express.json());
@@ -57,6 +57,11 @@ async function sendTyping(chatId = CHAT_ID) {
 
 app.post("/webhook", async (req, res) => {
   res.sendStatus(200); // respond immediately to Telegram
+  // Habits survey inline buttons
+  if (msg.callback_query) {
+    try { await handleHabitsCallback(msg.callback_query); } catch(e) { console.error('[Habits]',e.message); }
+    return;
+  }
 
   const update = req.body;
   const msg = update.message || update.edited_message;
@@ -289,8 +294,6 @@ app.get("/check-alerts", auth, async (req, res) => {
 });
 
 
-// ── Encuesta de hábitos diaria (Telegram) ───────────────────────────────────
-initHabitsSurvey(bot, process.env.TELEGRAM_CHAT_ID, supabase);
 
 // ─── Scheduled jobs ───────────────────────────────────────────────────────────
 
@@ -319,6 +322,9 @@ cron.schedule("0 15 * * *", async () => {
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────────
+
+// Encuesta habitos 10am
+initHabitsSurvey(sendTelegram, axios, process.env.TELEGRAM_BOT_TOKEN, process.env.TELEGRAM_CHAT_ID, supabase);
 
 app.listen(PORT, () => {
   console.log(`✅ tobin-health running on port ${PORT}`);

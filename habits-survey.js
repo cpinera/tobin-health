@@ -1,6 +1,9 @@
 const cron = require('node-cron');
 const surveyState = {};
-let _send, _axios, _token, _chatId, _sb;
+let _send, _axios, _token, _chatId;
+
+const SB_URL = process.env.SUPABASE_URL;
+const SB_KEY = process.env.SUPABASE_KEY;
 
 const STEPS = [
   {id:'alcohol', label:'ALCOHOL', q:'Tomaste alcohol ayer?', ops:[{t:'Nada',v:'nada'},{t:'Poco',v:'poco'},{t:'Medio',v:'medio'},{t:'Harto',v:'alto'}]},
@@ -10,11 +13,20 @@ const STEPS = [
   {id:'animo', label:'ANIMO', q:'Como esta tu animo?', ops:[{t:'20',v:'20'},{t:'40',v:'40'},{t:'60',v:'60'},{t:'80',v:'80'},{t:'100',v:'100'}]}
 ];
 
+const sbHeaders = () => ({
+  'apikey': SB_KEY,
+  'Authorization': 'Bearer ' + SB_KEY,
+  'Content-Type': 'application/json'
+});
+
 async function alreadyDone() {
   try {
     const today = new Date().toISOString().split('T')[0];
-    const {data} = await _sb.from('daily_habits').select('date').eq('date', today).single();
-    return !!data;
+    const r = await _axios.get(
+      SB_URL + '/rest/v1/daily_habits?select=date&date=eq.' + today + '&limit=1',
+      {headers: sbHeaders()}
+    );
+    return r.data && r.data.length > 0;
   } catch(e) { return false; }
 }
 
@@ -77,11 +89,8 @@ async function handleHabitsCallback(query) {
   const sel = step.ops.find(function(o) { return o.v === val; });
   await editMsg(chatId, query.message.message_id, '*' + step.label + '*\n' + step.q + '\n\n* ' + (sel ? sel.t : val));
   st.step++;
-  if (st.step < STEPS.length) {
-    await sendNext(chatId);
-  } else {
-    await finish(chatId, st);
-  }
+  if (st.step < STEPS.length) { await sendNext(chatId); }
+  else { await finish(chatId, st); }
   return true;
 }
 
@@ -97,8 +106,11 @@ async function finish(chatId, st) {
   };
   delete surveyState[chatId];
   try {
-    const result = await _sb.from('daily_habits').upsert(row, {onConflict: 'date'});
-    if (result.error) throw new Error(result.error.message);
+    await _axios.post(
+      SB_URL + '/rest/v1/daily_habits',
+      row,
+      {headers: Object.assign({}, sbHeaders(), {'Prefer': 'resolution=merge-duplicates,return=minimal'})}
+    );
     const msg = '*Check-in guardado!*\n\nAlcohol: ' + (a.alcohol || 'nada') +
       '\nMeditacion: ' + (a.meditado ? 'Si' : 'No') +
       '\nFuerza: ' + (a.fuerza ? 'Si' : 'No') +
@@ -107,16 +119,12 @@ async function finish(chatId, st) {
       '\n\n_Visible en tu dashboard_';
     await _send(msg, chatId);
   } catch(e) {
-    await _send('Error: ' + e.message, chatId);
+    await _send('Error guardando habitos: ' + e.message, chatId);
   }
 }
 
-function initHabitsSurvey(sendFn, axiosInst, token, chatId, sb) {
-  _send = sendFn;
-  _axios = axiosInst;
-  _token = token;
-  _chatId = String(chatId);
-  _sb = sb;
+function initHabitsSurvey(sendFn, axiosInst, token, chatId) {
+  _send = sendFn; _axios = axiosInst; _token = token; _chatId = String(chatId);
   cron.schedule('0 10 * * *', async function() {
     console.log('[Habits] Enviando encuesta...');
     try { await sendHabitsSurvey(_chatId); }
